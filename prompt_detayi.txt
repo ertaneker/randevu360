@@ -1,0 +1,3966 @@
+❯ şuan için her şey tamam şimdi yeni ve büyük bir özellik istiyorum dil paketi olsun istiyorum
+  uygulama ilk açıldığında telefon dili ne ise ve o dil kayıtlı dil paketlerinde varsa o dilde
+  açılmalı eğer kayıtlı dil paketlerinde yoksa ingilizce olarak açılmalı ve tüm karakterlerin
+  okunabilmesi için aşağıda yazacağım tüm dillerin dil paketlerini de yüklenmesini istiyorum
+  Diller:
+  1 Türkçe
+  2 İngilizce
+  3 Almanca
+  4 Fransızca
+  5 Rusca
+  6 Çince
+  7 Korece
+  8 Arapca
+  9 İtalyanca
+  10 Hintce
+
+  bu billerin dil paketlerinide yükle ki para birimi özel karakterkerde okuna bilsin
+
+● Büyük iş: 10 dilli yerelleştirme (cihaz diline göre otomatik, yoksa İngilizce). Flutter'ın standart
+  gen-l10n altyapısını kuracağım, tüm ekranlardaki metinleri çıkarıp 10 dile çevireceğim. Özel
+  karakterler (₺, ₽, 元, ₹, Arapça, Hangul...) Android'in sistem fontlarıyla sorunsuz görünür; Arapça
+  için RTL desteği de otomatik gelir
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ devam et
+
+● Devam. Önce kalan ekranları okuyup metin envanteri çıkarıyorum:
+
+  Read 5 files (ctrl+o to expand)
+
+● Kalan ekranları okuyorum (toplu):
+
+  Read 5 files (ctrl+o to expand)
+
+● Update(pubspec.yaml)
+  ⎿  Added 2 lines
+       9  dependencies:
+      10    flutter:
+      11      sdk: flutter
+      12 +  flutter_localizations:
+      13 +    sdk: flutter
+      14
+      15    # Firebase
+      16    firebase_core: ^2.25.0
+
+● Update(pubspec.yaml)
+  ⎿  Added 1 line
+      80
+      81  flutter:
+      82    uses-material-design: true
+      83 +  generate: true
+      84
+      85    assets:
+      86      - assets/images/
+
+● Write(l10n.yaml)
+  ⎿  Wrote 5 lines to l10n.yaml
+      1 arb-dir: lib/l10n
+      2 template-arb-file: app_en.arb
+      3 output-localizations-file: app_localizations.dart
+      4 output-class: AppLocalizations
+      5 untranslated-messages-file: l10n_untranslated.txt
+
+● Write(lib\l10n\app_en.arb)
+  ⎿  Wrote 367 lines to lib\l10n\app_en.arb
+       1 {
+       2   "@@locale": "en",
+       3   "appTitle": "Randevu 360",
+       4   "save": "Save",
+       5   "cancel": "Cancel",
+       6   "delete": "Delete",
+       7   "add": "Add",
+       8   "ok": "OK",
+       9   "retry": "Try again",
+      10   "all": "All",
+     … +372 lines (ctrl+o to expand)
+
+● Türkçe ARB:
+
+● Write(lib\l10n\app_tr.arb)
+  ⎿  Wrote 334 lines to lib\l10n\app_tr.arb
+       1 {
+       2   "@@locale": "tr",
+       3   "appTitle": "Randevu 360",
+       4   "save": "Kaydet",
+       5   "cancel": "İptal",
+       6   "delete": "Sil",
+       7   "add": "Ekle",
+       8   "ok": "Tamam",
+       9   "retry": "Tekrar dene",
+      10   "all": "Tümü",
+     … +333 lines (ctrl+o to expand)
+
+● Yardımcı extension + 8 dil için stub ARB'ler (çeviriler sona):
+
+● Write(lib\core\l10n\l10n_ext.dart)
+  ⎿  Wrote 9 lines to lib\core\l10n\l10n_ext.dart
+      1 import 'package:flutter/widgets.dart';
+      2 import '../../l10n/app_localizations.dart';
+      3
+      4 export '../../l10n/app_localizations.dart';
+      5
+      6 /// Kısa erişim: `context.l10n.save` gibi.
+      7 extension L10nX on BuildContext {
+      8   AppLocalizations get l10n => AppLocalizations.of(this)!;
+      9 }
+
+● PowerShell(cd D:\dosyalar\projeler\KolayRandevu\randevu360\mobile\lib\l10n; foreach ($loc in
+            'de','fr','ru','zh','ko','ar','it','hi') { Set-Content -Encoding utf8 -Path "a…)
+  ⎿  app_ar.arb
+     app_de.arb
+     app_en.arb
+     … +7 lines (ctrl+o to expand)
+
+● PowerShell(cd D:\dosyalar\projeler\KolayRandevu\randevu360\mobile; flutter gen-l10n 2>&1 |
+            Select-Object -First 10; Test-Path lib\l10n\app_localizations.dart)
+  ⎿  Because l10n.yaml exists, the options defined there will be used instead.
+     To use the command line arguments, delete the l10n.yaml file in the Flutter project.
+     … +2 lines (ctrl+o to expand)
+
+● Üretim çalıştı. app.dart bağlantısı:
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(lib\app.dart)
+  ⎿  Added 1 line
+      1  import 'package:flutter/material.dart';
+      2  import 'package:provider/provider.dart';
+      3 +import 'core/l10n/l10n_ext.dart';
+      4  import 'core/auth/auth_service.dart';
+      5  import 'core/database/database_service.dart';
+      6  import 'core/theme/app_theme.dart';
+
+● Update(lib\app.dart)
+  ⎿  Added 11 lines
+       89              theme: AppTheme.lightTheme,
+       90              darkTheme: AppTheme.darkTheme,
+       91              themeMode: ThemeMode.light,
+       92 +            localizationsDelegates: AppLocalizations.localizationsDelegates,
+       93 +            supportedLocales: AppLocalizations.supportedLocales,
+       94 +            // Cihaz dili destekleniyorsa o dil, yoksa İngilizce.
+       95 +            localeListResolutionCallback: (locales, supported) {
+       96 +              for (final locale in locales ?? const <Locale>[]) {
+       97 +                for (final s in supported) {
+       98 +                  if (s.languageCode == locale.languageCode) return s;
+       99 +                }
+      100 +              }
+      101 +              return const Locale('en');
+      102 +            },
+      103              home: _buildHome(context, auth),
+      104              routes: {
+      105                '/whatsapp-connect': (_) => const WhatsAppConnectScreen(),
+
+  Made 1 scratchpad edit +43 (ctrl+o to expand)
+
+● Dönüşümlere başlıyorum. Login + role selection:
+
+● Update(lib\screens\auth\login_screen.dart)
+  ⎿  Added 1 line
+      1  import 'package:flutter/material.dart';
+      2  import 'package:provider/provider.dart';
+      3 +import '../../core/l10n/l10n_ext.dart';
+      4  import '../../providers/auth_provider.dart';
+      5  import '../../core/auth/auth_service.dart';
+      6  import '../../core/theme/app_theme.dart';
+
+● Update(lib\screens\auth\login_screen.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      26              now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
+      27            _lastBackPress = now;
+      28            ScaffoldMessenger.of(context).showSnackBar(
+      29 -            const SnackBar(
+  ⎿  Added 3 lines, removed 3 lines
+      80                          ),
+      81                        ),
+      82                        const SizedBox(height: 8),
+      83 -                      const Text(
+      84 -                        'Küçük işletmeler için\nrandevu yönetimi',
+      83 +                      Text(
+      84 +                        context.l10n.appTagline,
+      85                          textAlign: TextAlign.center,
+      86 -                        style: TextStyle(
+      86 +                        style: const TextStyle(
+      87                            fontSize: 16,
+      88                            color: AppTheme.textSecondary,
+      89                            height: 1.5,
+
+● Update(lib\screens\auth\login_screen.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      147                                        height: 24,
+      148                                      ),
+      149                                      const SizedBox(width: 12),
+      150 -                                    const Text(
+      151 -                                      'Google ile Giriş Yap',
+      152 -                                      style: TextStyle(
+      150 +                                    Text(
+      151 +                                      context.l10n.signInWithGoogle,
+      152 +                                      style: const TextStyle(
+      153                                          fontSize: 16,
+      154                                          fontWeight: FontWeight.w600,
+      155                                        ),
+
+● Update(lib\screens\auth\login_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      161                        const SizedBox(height: 16),
+      162
+      163                        Text(
+      164 -                        'Giriş yaparak Kullanım Koşulları\'nı kabul etmiş olursunuz'
+          -,
+      164 +                        context.l10n.termsNotice,
+      165                          textAlign: TextAlign.center,
+      166                          style: TextStyle(
+      167                            fontSize: 12,
+
+● Update(lib\screens\auth\role_selection_screen.dart)
+  ⎿  Added 1 line
+       6  import '../../providers/employee_provider.dart';
+       7  import '../../core/database/database_service.dart';
+       8  import '../../services/firestore_sync_service.dart';
+       9 +import '../../core/l10n/l10n_ext.dart';
+      10  import '../../core/theme/app_theme.dart';
+      11  import '../business/business_setup_screen.dart';
+      12  import '../home/home_screen.dart';
+
+● Update(lib\screens\auth\role_selection_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      37                ),
+      38                const SizedBox(height: 16),
+      39                Text(
+      40 -                'Hoş geldin,\n${auth.user?.displayName ?? ""}',
+      40 +                context.l10n.welcomeUser(auth.user?.displayName ?? ''),
+      41                  textAlign: TextAlign.center,
+      42                  style: const TextStyle(
+      43                    fontSize: 24,
+
+● Update(lib\screens\auth\role_selection_screen.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      54                  ),
+      55                ),
+      56                const SizedBox(height: 48),
+      57 -              const Text(
+      58 -                'Nasıl devam etmek istersin?',
+      59 -                style: TextStyle(
+      57 +              Text(
+      58 +                context.l10n.howToContinue,
+      59 +                style: const TextStyle(
+      60                    fontSize: 18,
+      61                    fontWeight: FontWeight.w600,
+      62                    color: AppTheme.textPrimary,
+
+● Update(lib\screens\auth\role_selection_screen.dart)
+  ⎿  Added 5 lines, removed 5 lines
+      67                // İşletme Sahibi
+      68                _RoleCard(
+      69                  icon: Icons.store,
+      70 -                title: 'İşletme Sahibiyim',
+      71 -                subtitle: 'Yeni işletme oluştur veya mevcut işletmemi yönet',
+      70 +                title: context.l10n.roleOwnerTitle,
+      71 +                subtitle: context.l10n.roleOwnerSubtitle,
+      72                  color: AppTheme.primary,
+      73                  onTap: () => _checkBusiness(context, auth),
+      74                ),
+     ...
+      77                // Çalışan
+      78                _RoleCard(
+      79                  icon: Icons.badge,
+      80 -                title: 'Çalışanım',
+      81 -                subtitle: 'İşletme sahibinin davetiyle hesabıma eriş',
+      80 +                title: context.l10n.roleEmployeeTitle,
+      81 +                subtitle: context.l10n.roleEmployeeSubtitle,
+      82                  color: AppTheme.accent,
+      83                  onTap: () => _enterAsEmployee(context),
+      84                ),
+     ...
+      86                const SizedBox(height: 32),
+      87                TextButton(
+      88                  onPressed: () => auth.signOut(),
+      89 -                child: const Text('Farklı hesap kullan'),
+      89 +                child: Text(context.l10n.useDifferentAccount),
+      90                ),
+      91              ],
+      92            ),
+
+● Update(lib\screens\auth\role_selection_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      133      final uid = user?.uid;
+      134
+      135      if (email == null || uid == null) {
+      136 -      _showInfoDialog(context, 'Giriş yapılmamış', 'Lütfen önce Google hesabınızla g
+          -iriş yapın.');
+      136 +      _showInfoDialog(context, context.l10n.notSignedInTitle, context.l10n.notSigned
+          +InMessage);
+      137        return;
+      138      }
+      139
+
+● Update(lib\screens\auth\role_selection_screen.dart)
+  ⎿  Added 2 lines, removed 3 lines
+      154        if (employeeData == null) {
+      155          _showInfoDialog(
+      156            context,
+      157 -          'Davet Bulunamadı',
+      158 -          'Bu e-posta adresiyle size yapılmış bir davet bulunamadı.\n\n'
+      159 -          'İşletme sahibinden sizi sisteme eklemesini isteyin.',
+      157 +          context.l10n.inviteNotFoundTitle,
+      158 +          context.l10n.inviteNotFoundMessage,
+      159          );
+      160          return;
+      161        }
+
+● Update(lib\screens\auth\role_selection_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      166
+      167        if (remoteBusinessId.isEmpty) {
+      168          if (context.mounted) {
+      169 -          _showInfoDialog(context, 'Hata', 'İşletme bilgisi geçersiz.');
+      169 +          _showInfoDialog(context, context.l10n.errorTitle, context.l10n.invalidBusi
+          +nessInfo);
+      170          }
+      171          return;
+      172        }
+
+● Update(lib\screens\auth\role_selection_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      179
+      180        if (businessId == null) {
+      181          if (context.mounted) {
+      182 -          _showInfoDialog(context, 'Hata',
+      183 -              'İşletme kaydı oluşturulamadı: ${businessProvider.error ?? ''}');
+      182 +          _showInfoDialog(context, context.l10n.errorTitle,
+      183 +              context.l10n.businessRecordFailed(businessProvider.error ?? ''));
+      184          }
+      185          return;
+      186        }
+
+● Update(lib\screens\auth\role_selection_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      223          Navigator.pop(context); // dismiss loading
+      224          _showInfoDialog(
+      225            context,
+      226 -          'Bağlantı Hatası',
+      227 -          'Çalışan daveti kontrol edilemedi. İnternet bağlantınızı kontrol edip tekr
+          -ar deneyin.',
+      226 +          context.l10n.connectionErrorTitle,
+      227 +          context.l10n.inviteCheckFailed,
+      228          );
+      229        }
+      230      }
+
+● Update(lib\screens\auth\role_selection_screen.dart)
+  ⎿  Added 3 lines, removed 2 lines
+      236        builder: (_) => AlertDialog(
+      237          title: Row(
+      238            children: [
+      239 -            Icon(Icons.badge, color: title.contains('Hata') ? AppTheme.error : AppTh
+          -eme.secondary),
+      239 +            Icon(Icons.badge,
+      240 +                color: title == context.l10n.errorTitle ? AppTheme.error : AppTheme.
+          +secondary),
+      241              const SizedBox(width: 12),
+      242              Text(title),
+      243            ],
+     ...
+      246          actions: [
+      247            TextButton(
+      248              onPressed: () => Navigator.pop(context),
+      248 -            child: const Text('Tamam'),
+      249 +            child: Text(context.l10n.ok),
+      250            ),
+      251          ],
+      252        ),
+
+● Home ekranı (sekmeler):
+
+● Update(lib\screens\home\home_screen.dart)
+  ⎿  Added 1 line
+      1  import 'package:flutter/material.dart';
+      2  import 'package:provider/provider.dart';
+      3 +import '../../core/l10n/l10n_ext.dart';
+      4  import '../../core/theme/app_theme.dart';
+      5  import '../../providers/auth_provider.dart';
+      6  import '../appointment/appointment_screen.dart';
+
+● Update(lib\screens\home\home_screen.dart)
+  ⎿  Added 13 lines, removed 12 lines
+      42              ProfileScreen(),
+      43            ];
+      44
+      45 +    final l10n = context.l10n;
+      46      final items = isAdmin
+      46 -        ? const [
+      47 -            BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Ana Sayfa'),
+      48 -            BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Randevu
+         -lar'),
+      49 -            BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Müşteriler'),
+      50 -            BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label:
+         -'Finans'),
+      51 -            BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Çalışanlar'),
+      52 -            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
+      47 +        ? [
+      48 +            BottomNavigationBarItem(icon: const Icon(Icons.dashboard), label: l10n.ta
+         +bHome),
+      49 +            BottomNavigationBarItem(icon: const Icon(Icons.calendar_month), label: l1
+         +0n.tabAppointments),
+      50 +            BottomNavigationBarItem(icon: const Icon(Icons.groups), label: l10n.tabCu
+         +stomers),
+      51 +            BottomNavigationBarItem(icon: const Icon(Icons.account_balance_wallet), l
+         +abel: l10n.tabFinance),
+      52 +            BottomNavigationBarItem(icon: const Icon(Icons.people), label: l10n.tabEm
+         +ployees),
+      53 +            BottomNavigationBarItem(icon: const Icon(Icons.person), label: l10n.tabPr
+         +ofile),
+      54            ]
+      54 -        : const [
+      55 -            BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Ana Sayfa'),
+      56 -            BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Randevu
+         -lar'),
+      57 -            BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'Müşteriler'),
+      58 -            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
+      55 +        : [
+      56 +            BottomNavigationBarItem(icon: const Icon(Icons.dashboard), label: l10n.ta
+         +bHome),
+      57 +            BottomNavigationBarItem(icon: const Icon(Icons.calendar_month), label: l1
+         +0n.tabAppointments),
+      58 +            BottomNavigationBarItem(icon: const Icon(Icons.groups), label: l10n.tabCu
+         +stomers),
+      59 +            BottomNavigationBarItem(icon: const Icon(Icons.person), label: l10n.tabPr
+         +ofile),
+      60            ];
+      61
+      62      // Rol değişiminde index taşmasını önle
+
+● Update(lib\screens\home\dashboard_widget.dart)
+  ⎿  Added 1 line
+      1  import 'package:flutter/material.dart';
+      2  import 'package:provider/provider.dart';
+      3 +import '../../core/l10n/l10n_ext.dart';
+      4  import '../../providers/appointment_provider.dart';
+      5  import '../../providers/auth_provider.dart';
+      6  import '../../providers/business_provider.dart';
+
+● Update(lib\screens\home\dashboard_widget.dart)
+  ⎿  Added 1 line, removed 1 line
+      78                      Expanded(
+      79                        child: _StatCard(
+      80                          icon: Icons.calendar_today,
+      81 -                        label: 'Bugün',
+      81 +                        label: context.l10n.statToday,
+      82                          value: '${aptProvider.totalToday}',
+      83                          color: AppTheme.primary,
+      84                        ),
+
+● Update(lib\screens\home\dashboard_widget.dart)
+  ⎿  Added 1 line, removed 1 line
+      87                      Expanded(
+      88                        child: _StatCard(
+      89                          icon: Icons.check_circle,
+      90 -                        label: 'Tamamlanan',
+      90 +                        label: context.l10n.statCompleted,
+      91                          value: '${aptProvider.completedToday}',
+      92                          color: AppTheme.success,
+      93                        ),
+
+● Update(lib\screens\home\dashboard_widget.dart)
+  ⎿  Added 1 line, removed 1 line
+      100                      Expanded(
+      101                        child: _StatCard(
+      102                          icon: Icons.hourglass_empty,
+      103 -                        label: 'Bekleyen',
+      103 +                        label: context.l10n.statPending,
+      104                          value: '${aptProvider.pendingToday}',
+      105                          color: AppTheme.warning,
+      106                        ),
+
+● Update(lib\screens\home\dashboard_widget.dart)
+  ⎿  Added 1 line, removed 1 line
+      111                          builder: (context, customerProv, _) {
+      112                            return _StatCard(
+      113                              icon: Icons.people,
+      114 -                            label: 'Toplam Müşteri',
+      114 +                            label: context.l10n.statTotalCustomers,
+      115                              value: '${customerProv.customers.length}',
+      116                              color: AppTheme.accent,
+      117                            );
+
+● Update(lib\screens\home\dashboard_widget.dart)
+  ⎿  Added 6 lines, removed 6 lines
+      123                  const SizedBox(height: 24),
+      124
+      125                  // Quick actions
+      126 -                const Text(
+      127 -                  'Hızlı İşlemler',
+      128 -                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      126 +                Text(
+      127 +                  context.l10n.quickActions,
+      128 +                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      129                  ),
+      130                  const SizedBox(height: 12),
+      131                  Row(
+      132                    children: [
+      133                      _QuickActionButton(
+      134                        icon: Icons.add_circle,
+      135 -                      label: 'Yeni Randevu',
+      135 +                      label: context.l10n.quickNewAppointment,
+      136                        color: AppTheme.primary,
+      137                        onTap: () => Navigator.pushNamed(context, '/new-appointment'),
+      138                      ),
+      139                      const SizedBox(width: 12),
+      140                      _QuickActionButton(
+      141                        icon: Icons.people_outline,
+      142 -                      label: 'Müşteri Ekle',
+      142 +                      label: context.l10n.quickAddCustomer,
+      143                        color: AppTheme.success,
+      144                        onTap: () => Navigator.push(
+      145                          context,
+     ...
+      150                        const SizedBox(width: 12),
+      151                        _QuickActionButton(
+      152                          icon: Icons.send_rounded,
+      153 -                        label: 'Toplu Mesaj',
+      153 +                        label: context.l10n.quickBulkMessage,
+      154                          color: const Color(0xFF25D366),
+      155                          onTap: () => Navigator.push(
+      156                            context,
+
+● Update(lib\screens\home\dashboard_widget.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      170                  ],
+      171
+      172                  // Today's appointments list
+      173 -                const Text(
+      174 -                  "Bugünkü Randevular",
+      175 -                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      173 +                Text(
+      174 +                  context.l10n.todaysAppointments,
+      175 +                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      176                  ),
+      177                  const SizedBox(height: 12),
+      178                  if (aptProvider.todayAppointments.isEmpty)
+
+● Update(lib\screens\home\dashboard_widget.dart)
+  ⎿  Added 1 line, removed 1 line
+      184                            Icon(Icons.event_busy, size: 48, color: Colors.grey[400]),
+      185                            const SizedBox(height: 12),
+      186                            Text(
+      187 -                            'Bugün randevu yok',
+      187 +                            context.l10n.noAppointmentsToday,
+      188                              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+      189                            ),
+      190                          ],
+
+● Update(lib\screens\home\dashboard_widget.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      321          final Color indicatorColor;
+      322
+      323          if (connected) {
+      324 -          subtitle = 'Bağlandı';
+      324 +          subtitle = context.l10n.waConnected;
+      325            indicatorColor = Colors.green;
+      326          } else if (wa.isPairing) {
+      327 -          subtitle = 'Eşleştiriliyor...';
+      327 +          subtitle = context.l10n.waPairing;
+      328            indicatorColor = Colors.orange;
+      329          } else if (wa.error != null) {
+      330            subtitle = wa.error!;
+      331            indicatorColor = Colors.red;
+      332          } else {
+      333 -          subtitle = 'Henüz bağlanmadı';
+      333 +          subtitle = context.l10n.waNotConnected;
+      334            indicatorColor = Colors.red;
+      335          }
+      336
+      238          ],
+
+● Update(lib\screens\home\dashboard_widget.dart)
+  ⎿  Added 7 lines, removed 7 lines
+      373            backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
+      374            child: const Icon(Icons.person, color: AppTheme.primary),
+      375          ),
+      376 -        title: Text(appointment['customerName'] ?? 'Müşteri'),
+      376 +        title: Text(appointment['customerName'] ?? context.l10n.customerFallback),
+      377          subtitle: Text('${appointment['time']} • ${appointment['service'] ?? ''}'),
+      378 -        trailing: _statusChip(appointment['status']),
+      378 +        trailing: _statusChip(context, appointment['status']),
+      379        ),
+      380      );
+      381    }
+      382
+      383 -  Widget _statusChip(String? status) {
+      383 +  Widget _statusChip(BuildContext context, String? status) {
+      384      Color color;
+      385      String text;
+      386
+      387      switch (status) {
+      388        case 'confirmed':
+      389          color = AppTheme.success;
+      390 -        text = 'Onaylandı';
+      390 +        text = context.l10n.statusConfirmed;
+      391        case 'completed':
+      392          color = Colors.grey;
+      393 -        text = 'Tamamlandı';
+      393 +        text = context.l10n.statusCompleted;
+      394        case 'cancelled':
+      395          color = AppTheme.error;
+      396 -        text = 'İptal';
+      396 +        text = context.l10n.statusCancelled;
+      397        default:
+      398          color = AppTheme.warning;
+      399 -        text = 'Bekliyor';
+      399 +        text = context.l10n.statusPending;
+      400      }
+      401
+      402      return Container(
+
+● Randevu ekranı:
+
+● Update(lib\screens\appointment\appointment_screen.dart)
+  ⎿  Added 1 line
+       8  import '../../providers/employee_provider.dart';
+       9  import '../../providers/finance_provider.dart';
+      10  import '../../providers/whatsapp_provider.dart';
+      11 +import '../../core/l10n/l10n_ext.dart';
+      12  import '../../core/theme/app_theme.dart';
+      13  import '../../services/debt_sync.dart';
+      14  import 'new_appointment_screen.dart';
+
+● Update(lib\screens\appointment\appointment_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      84    Widget build(BuildContext context) {
+      85      return Scaffold(
+      86        appBar: AppBar(
+      87 -        title: const Text('Randevular'),
+      87 +        title: Text(context.l10n.appointmentsTitle),
+      88          actions: [
+      89            IconButton(
+      90              icon: const Icon(Icons.add),
+
+● Update(lib\screens\appointment\appointment_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      130                  child: Row(
+      131                    children: [
+      132                      Text(
+      133 -                      '${provider.selectedDayAppointments.length} randevu',
+      133 +                      context.l10n.appointmentCountLabel(provider.selectedDayAppoint
+          +ments.length),
+      134                        style: const TextStyle(
+      135                          fontSize: 16,
+      136                          fontWeight: FontWeight.w600,
+
+● Update(lib\screens\appointment\appointment_screen.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      144                          return DropdownButtonHideUnderline(
+      145                            child: DropdownButton<int?>(
+      146                              value: provider.filterEmployeeId,
+      147 -                            hint: const Text('Tüm Çalışanlar', style: TextStyle(font
+          -Size: 13)),
+      147 +                            hint: Text(context.l10n.allEmployees, style: const TextS
+          +tyle(fontSize: 13)),
+      148                              isDense: true,
+      149                              items: [
+      150 -                              const DropdownMenuItem<int?>(
+      150 +                              DropdownMenuItem<int?>(
+      151                                  value: null,
+      152 -                                child: Text('Tüm Çalışanlar', style: TextStyle(fontS
+          -ize: 13)),
+      152 +                                child: Text(context.l10n.allEmployees, style: const
+          +TextStyle(fontSize: 13)),
+      153                                ),
+      154                                ...empProv.employees.where((e) => e['status'] == 'acti
+           ve').map((e) {
+      155                                  return DropdownMenuItem<int?>(
+
+● Update(lib\screens\appointment\appointment_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      177                              Icon(Icons.event_note, size: 64, color: Colors.grey[400]
+           ),
+      178                              const SizedBox(height: 12),
+      179                              Text(
+      180 -                              'Bu günde randevu yok',
+      180 +                              context.l10n.noAppointmentsThisDay,
+      181                                style: TextStyle(color: Colors.grey[600], fontSize: 16
+           ),
+      182                              ),
+      183                              const SizedBox(height: 8),
+      184                              ElevatedButton.icon(
+      185                                onPressed: () => Navigator.push(context, MaterialPageR
+           oute(builder: (_) => const NewAppointmentScreen())),
+      186                                icon: const Icon(Icons.add, size: 18),
+      187 -                              label: const Text('Randevu Ekle'),
+      187 +                              label: Text(context.l10n.addAppointment),
+      188                              ),
+      189                            ],
+      190                          ),
+
+● Update(lib\screens\appointment\appointment_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      200                                  backgroundColor: _statusColor(apt['status']).withVal
+           ues(alpha: 0.1),
+      201                                  child: Icon(Icons.person, color: _statusColor(apt['s
+           tatus'])),
+      202                                ),
+      203 -                              title: Text(apt['customerName'] ?? 'Müşteri #${apt['cu
+          -stomerId']}'),
+      203 +                              title: Text(apt['customerName'] ?? '${context.l10n.cus
+          +tomerFallback} #${apt['customerId']}'),
+      204                                subtitle: Text('${apt['time']} • ${apt['serviceName']
+           ?? ''}'),
+      205                                trailing: Column(
+      206                                  mainAxisSize: MainAxisSize.min,
+
+● Update(lib\screens\appointment\appointment_screen.dart)
+  ⎿  Added 14 lines, removed 14 lines
+      243            children: [
+      244              Row(
+      245                children: [
+      246 -                const Text('Randevu Detayı', style: TextStyle(fontSize: 20, fontWeig
+          -ht: FontWeight.bold)),
+      246 +                Text(context.l10n.appointmentDetail, style: const TextStyle(fontSize
+          +: 20, fontWeight: FontWeight.bold)),
+      247                  const Spacer(),
+      248                  _statusBadge(apt['status']),
+      249                ],
+      250              ),
+      251              const SizedBox(height: 20),
+      252 -            _detailRow('Müşteri', apt['customerName'] ?? 'Müşteri #${apt['customerId
+          -']}'),
+      253 -            _detailRow('Tarih', apt['date'] ?? ''),
+      254 -            _detailRow('Saat', apt['time'] ?? ''),
+      255 -            _detailRow('Hizmet', apt['serviceName'] ?? ''),
+      256 -            _detailRow('Ücret', '${apt['price']?.toStringAsFixed(0) ?? '0'} ₺'),
+      252 +            _detailRow(context.l10n.customerLabel, apt['customerName'] ?? '${context
+          +.l10n.customerFallback} #${apt['customerId']}'),
+      253 +            _detailRow(context.l10n.dateLabel, apt['date'] ?? ''),
+      254 +            _detailRow(context.l10n.timeLabel, apt['time'] ?? ''),
+      255 +            _detailRow(context.l10n.serviceLabel, apt['serviceName'] ?? ''),
+      256 +            _detailRow(context.l10n.priceLabel, '${apt['price']?.toStringAsFixed(0)
+          +?? '0'} ₺'),
+      257              if (apt['note'] != null && (apt['note'] as String).isNotEmpty)
+      258 -              _detailRow('Not', apt['note']),
+      258 +              _detailRow(context.l10n.noteLabel, apt['note']),
+      259              const SizedBox(height: 20),
+      260              if (apt['status'] == 'completed')
+      261 -              const Row(
+      261 +              Row(
+      262                  children: [
+      263 -                  Icon(Icons.check_circle, color: AppTheme.success, size: 18),
+      264 -                  SizedBox(width: 8),
+      263 +                  const Icon(Icons.check_circle, color: AppTheme.success, size: 18),
+      264 +                  const SizedBox(width: 8),
+      265                    Text(
+      266 -                    'Tamamlandı, ödemesi alındı',
+      267 -                    style: TextStyle(color: AppTheme.textSecondary),
+      266 +                    context.l10n.completedPaidNote,
+      267 +                    style: const TextStyle(color: AppTheme.textSecondary),
+      268                    ),
+      269                  ],
+      270                )
+     ...
+      275                      child: OutlinedButton.icon(
+      276                        onPressed: () => _cancelAppointment(context, apt),
+      277                        icon: const Icon(Icons.cancel, color: AppTheme.error),
+      278 -                      label: const Text('İptal Et', style: TextStyle(color: AppTheme
+          -.error)),
+      278 +                      label: Text(context.l10n.cancelAppointment, style: const TextS
+          +tyle(color: AppTheme.error)),
+      279                      ),
+      280                    ),
+      281                    const SizedBox(width: 12),
+     ...
+      283                      child: ElevatedButton.icon(
+      284                        onPressed: () => _completeWithPayment(context, apt),
+      285                        icon: const Icon(Icons.check),
+      286 -                      label: const Text('Tamamlandı'),
+      286 +                      label: Text(context.l10n.markCompleted),
+      287                      ),
+      288                    ),
+      289                  ],
+
+● Update(lib\screens\appointment\appointment_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      309
+      310      ScaffoldMessenger.of(context).showSnackBar(
+      311        SnackBar(
+      312 -        content: Text(ok ? 'Randevu iptal edildi' : 'Randevu iptal edilemedi'),
+      312 +        content: Text(ok ? context.l10n.appointmentCancelled : context.l10n.appointm
+          +entCancelFailed),
+      313          backgroundColor: ok ? AppTheme.success : AppTheme.error,
+      314        ),
+      315      );
+
+● Update(lib\screens\appointment\appointment_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      326        context: context,
+      327        builder: (_) => PaymentDialog(
+      328          appointmentPrice: (apt['price'] as double?) ?? 0,
+      329 -        customerName: apt['customerName']?.toString() ?? 'Müşteri #${apt['customerId
+          -']}',
+      329 +        customerName: apt['customerName']?.toString() ?? '${context.l10n.customerFal
+          +lback} #${apt['customerId']}',
+      330        ),
+      331      );
+      332
+
+● Update(lib\screens\appointment\appointment_screen.dart)
+  ⎿  Added 9 lines, removed 5 lines
+      380      unawaited(_notifyStatusChange(apt, 'completed', 'appointment-completed'));
+      381
+      382      final ok = statusOk && incomeOk && debtOk;
+      383 -    final methodLabel = result.method == 'cash' ? 'nakit' : 'kart';
+      383 +    final methodLabel = result.method == 'cash'
+      384 +        ? context.l10n.paymentCashLower
+      385 +        : context.l10n.paymentCardLower;
+      386      final parts = <String>[
+      385 -      if (result.amount > 0) '${result.amount.toStringAsFixed(0)} ₺ $methodLabel tah
+          -sil edildi',
+      386 -      if (result.debtAmount > 0) '${result.debtAmount.toStringAsFixed(0)} ₺ borç yaz
+          -ıldı',
+      387 +      if (result.amount > 0)
+      388 +        context.l10n.collectedSummary(result.amount.toStringAsFixed(0), methodLabel)
+          +,
+      389 +      if (result.debtAmount > 0)
+      390 +        context.l10n.debtRecordedSummary(result.debtAmount.toStringAsFixed(0)),
+      391      ];
+      392      ScaffoldMessenger.of(context).showSnackBar(
+      393        SnackBar(
+      394          content: Text(ok
+      391 -            ? (parts.isEmpty ? 'Randevu tamamlandı' : parts.join(', '))
+      392 -            : 'Tahsilat kaydedilemedi'),
+      395 +            ? (parts.isEmpty ? context.l10n.appointmentCompletedMsg : parts.join(',
+          +'))
+      396 +            : context.l10n.paymentSaveFailed),
+      397          backgroundColor: ok ? AppTheme.success : AppTheme.error,
+      398        ),
+      399      );
+
+● Update(lib\screens\appointment\appointment_screen.dart)
+  ⎿  Added 7 lines, removed 1 line
+      461
+      462    Widget _statusBadge(String? status) {
+      463      final color = _statusColor(status);
+      464 -    final text = status == 'confirmed' ? 'Onaylı' : status == 'completed' ? 'Bitti'
+          -: status == 'cancelled' ? 'İptal' : 'Bekliyor';
+      464 +    final text = status == 'confirmed'
+      465 +        ? context.l10n.statusShortConfirmed
+      466 +        : status == 'completed'
+      467 +            ? context.l10n.statusShortCompleted
+      468 +            : status == 'cancelled'
+      469 +                ? context.l10n.statusShortCancelled
+      470 +                : context.l10n.statusShortPending;
+      471      return Container(
+      472        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      473        decoration: BoxDecoration(
+
+● Yeni randevu ekranı:
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 1 line
+       9  import '../../providers/business_provider.dart';
+      10  import '../../providers/service_provider.dart';
+      11  import '../../providers/whatsapp_provider.dart';
+      12 +import '../../core/l10n/l10n_ext.dart';
+      13  import '../../core/theme/app_theme.dart';
+      14
+      15  class NewAppointmentScreen extends StatefulWidget {
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      126      try {
+      127        final business = context.read<BusinessProvider>().business;
+      128        if (business == null) {
+      129 -        _showError('Isletme bilgisi bulunamadi');
+      129 +        _showError(context.l10n.businessInfoNotFound);
+      130          return;
+      131        }
+      132        final businessId = business['id'] as int;
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      157
+      158        if (appointmentId == null) {
+      159          if (mounted) {
+      160 -          _showError(appointmentProvider.error ?? 'Randevu olusturulamadi');
+      160 +          _showError(appointmentProvider.error ?? context.l10n.appointmentCreateFail
+          +ed);
+      161          }
+      162          return;
+      163        }
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      178        ));
+      179
+      180        ScaffoldMessenger.of(context).showSnackBar(
+      181 -        const SnackBar(
+      182 -          content: Text('Randevu basariyla olusturuldu'),
+      181 +        SnackBar(
+      182 +          content: Text(context.l10n.appointmentCreated),
+      183            backgroundColor: AppTheme.success,
+      184          ),
+      185        );
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      246
+      247      final phone = _phoneController.text.trim();
+      248      if (phone.isEmpty) {
+      249 -      _showError('Musteri telefonu gereklidir');
+      249 +      _showError(context.l10n.customerPhoneRequired);
+      250        return null;
+      251      }
+      252
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      261      // No existing customer found — create a new one
+      262      final name = _nameController.text.trim();
+      263      if (name.isEmpty) {
+      264 -      _showError('Musteri adi gereklidir');
+      264 +      _showError(context.l10n.customerNameRequired);
+      265        return null;
+      266      }
+      267
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      272      });
+      273
+      274      if (!created) {
+      275 -      _showError('Musteri olusturulamadi');
+      275 +      _showError(context.l10n.customerCreateFailed);
+      276        return null;
+      277      }
+      278
+      279      // Look up the newly created customer to get its ID
+      280      final newCustomer = await customerProvider.getCustomerByPhone(phone);
+      281      if (newCustomer == null) {
+      282 -      _showError('Musteri olusturulamadi');
+      282 +      _showError(context.l10n.customerCreateFailed);
+      283        return null;
+      284      }
+      285      return newCustomer['id'] as int;
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      338    Widget build(BuildContext context) {
+      339      return Scaffold(
+      340        appBar: AppBar(
+      341 -        title: const Text('Yeni Randevu'),
+      341 +        title: Text(context.l10n.newAppointment),
+      342          leading: IconButton(
+      343            icon: const Icon(Icons.arrow_back),
+      344            onPressed: () => Navigator.pop(context),
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 6 lines, removed 6 lines
+      352              crossAxisAlignment: CrossAxisAlignment.stretch,
+      353              children: [
+      354                // Customer section
+      355 -              _sectionTitle('Musteri'),
+      355 +              _sectionTitle(context.l10n.sectionCustomer),
+      356                const SizedBox(height: 8),
+      357                Consumer<CustomerProvider>(
+      358                  builder: (context, customerProvider, _) {
+      359                    return DropdownButtonFormField<int>(
+      360                      initialValue: _selectedCustomerId,
+      361 -                    decoration: const InputDecoration(
+      362 -                      labelText: 'Musteri Secin',
+      363 -                      prefixIcon: Icon(Icons.people),
+      361 +                    decoration: InputDecoration(
+      362 +                      labelText: context.l10n.selectCustomer,
+      363 +                      prefixIcon: const Icon(Icons.people),
+      364                      ),
+      365                      isExpanded: true,
+      366                      items: [
+      367 -                      const DropdownMenuItem<int>(
+      367 +                      DropdownMenuItem<int>(
+      368                          value: -1,
+      369 -                        child: Text('+ Yeni Musteri Ekle'),
+      369 +                        child: Text(context.l10n.addNewCustomerItem),
+      370                        ),
+      371                        ...customerProvider.customers.map((c) {
+      372                          return DropdownMenuItem<int>(
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 26 lines, removed 29 lines
+      387                const SizedBox(height: 12),
+      388                TextFormField(
+      389                  controller: _nameController,
+      390 -                decoration: const InputDecoration(
+      391 -                  labelText: 'Musteri Adi *',
+      392 -                  prefixIcon: Icon(Icons.person),
+      390 +                decoration: InputDecoration(
+      391 +                  labelText: context.l10n.customerNameField,
+      392 +                  prefixIcon: const Icon(Icons.person),
+      393                  ),
+      394                  textCapitalization: TextCapitalization.words,
+      395                  validator: (value) {
+      396                    if (value == null || value.trim().isEmpty) {
+      397 -                    return 'Musteri adi gerekli';
+      397 +                    return context.l10n.customerNameRequired;
+      398                    }
+      399                    return null;
+      400                  },
+     ...
+      402                const SizedBox(height: 12),
+      403                TextFormField(
+      404                  controller: _phoneController,
+      405 -                decoration: const InputDecoration(
+      406 -                  labelText: 'Telefon *',
+      407 -                  prefixIcon: Icon(Icons.phone),
+      405 +                decoration: InputDecoration(
+      406 +                  labelText: context.l10n.phoneField,
+      407 +                  prefixIcon: const Icon(Icons.phone),
+      408                    hintText: '05XX XXX XX XX',
+      409                  ),
+      410                  keyboardType: TextInputType.phone,
+      411                  validator: (value) {
+      412                    if (value == null || value.trim().isEmpty) {
+      413 -                    return 'Telefon numarasi gerekli';
+      413 +                    return context.l10n.phoneRequired;
+      414                    }
+      415                    return null;
+      416                  },
+     ...
+      419                const SizedBox(height: 24),
+      420
+      421                // Service section
+      422 -              _sectionTitle('Hizmet'),
+      422 +              _sectionTitle(context.l10n.sectionService),
+      423                const SizedBox(height: 8),
+      424                Consumer<ServiceProvider>(
+      425                  builder: (context, serviceProvider, _) {
+      426                    if (serviceProvider.services.isEmpty) {
+      427                      return Card(
+      428                        color: AppTheme.warning.withValues(alpha: 0.1),
+      429 -                      child: const Padding(
+      430 -                        padding: EdgeInsets.all(16),
+      431 -                        child: Text(
+      432 -                          'Henuz hizmet tanimlanmamis.\n'
+      433 -                          'Profil > Hizmetler ekranindan hizmet ve fiyat tanimlayin.
+          -',
+      434 -                        ),
+      429 +                      child: Padding(
+      430 +                        padding: const EdgeInsets.all(16),
+      431 +                        child: Text(context.l10n.noServicesDefined),
+      432                        ),
+      433                      );
+      434                    }
+      435                    return DropdownButtonFormField<int>(
+      436                      initialValue: _selectedServiceId,
+      440 -                    decoration: const InputDecoration(
+      441 -                      labelText: 'Hizmet Secin *',
+      442 -                      prefixIcon: Icon(Icons.design_services),
+      437 +                    decoration: InputDecoration(
+      438 +                      labelText: context.l10n.selectServiceField,
+      439 +                      prefixIcon: const Icon(Icons.design_services),
+      440                      ),
+      441                      isExpanded: true,
+      442                      items: serviceProvider.services.map((service) {
+     ...
+      444                        return DropdownMenuItem<int>(
+      445                          value: service['id'] as int,
+      446                          child: Text(
+      450 -                          '${service['name']} ($price TL)',
+      447 +                          '${service['name']} ($price ₺)',
+      448                            overflow: TextOverflow.ellipsis,
+      449                          ),
+      450                        );
+     ...
+      452                      onChanged: _onServiceChanged,
+      453                      validator: (value) {
+      454                        if (value == null) {
+      458 -                        return 'Hizmet secimi gerekli';
+      455 +                        return context.l10n.serviceRequired;
+      456                        }
+      457                        return null;
+      458                      },
+     ...
+      462                const SizedBox(height: 12),
+      463                TextFormField(
+      464                  controller: _priceController,
+      468 -                decoration: const InputDecoration(
+      469 -                  labelText: 'Ucret (TL) *',
+      470 -                  prefixIcon: Icon(Icons.monetization_on),
+      465 +                decoration: InputDecoration(
+      466 +                  labelText: context.l10n.priceField,
+      467 +                  prefixIcon: const Icon(Icons.monetization_on),
+      468                  ),
+      469                  keyboardType: TextInputType.number,
+      470                  validator: (value) {
+      471                    if (value == null || value.trim().isEmpty) {
+      475 -                    return 'Ucret gerekli';
+      472 +                    return context.l10n.priceRequired;
+  ⎿  Added 9 lines, removed 8 lines
+      522                const SizedBox(height: 24),
+      523
+      524                // Date and Time section
+      525 -              _sectionTitle('Tarih ve Saat'),
+      525 +              _sectionTitle(context.l10n.sectionDateTime),
+      526                const SizedBox(height: 8),
+      527                Row(
+      528                  children: [
+     ...
+      531                        onTap: _pickDate,
+      532                        borderRadius: BorderRadius.circular(12),
+      533                        child: InputDecorator(
+      534 -                        decoration: const InputDecoration(
+      535 -                          labelText: 'Tarih *',
+      536 -                          prefixIcon: Icon(Icons.calendar_today),
+      534 +                        decoration: InputDecoration(
+      535 +                          labelText: context.l10n.dateField,
+      536 +                          prefixIcon: const Icon(Icons.calendar_today),
+      537                          ),
+      538                          child: Text(
+      539 -                          DateFormat('dd MMM yyyy').format(_selectedDate),
+      539 +                          DateFormat('dd MMM yyyy', Localizations.localeOf(context).
+          +toString())
+      540 +                              .format(_selectedDate),
+      541                            style: const TextStyle(fontSize: 16),
+      542                          ),
+      543                        ),
+     ...
+      549                        onTap: _pickTime,
+      550                        borderRadius: BorderRadius.circular(12),
+      551                        child: InputDecorator(
+      551 -                        decoration: const InputDecoration(
+      552 -                          labelText: 'Saat *',
+      553 -                          prefixIcon: Icon(Icons.access_time),
+      552 +                        decoration: InputDecoration(
+      553 +                          labelText: context.l10n.timeField,
+      554 +                          prefixIcon: const Icon(Icons.access_time),
+      555                          ),
+      556                          child: Text(
+      557                            _selectedTime.format(context),
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 5 lines, removed 5 lines
+      566                const SizedBox(height: 24),
+      567
+      568                // Note section
+      569 -              _sectionTitle('Not'),
+      569 +              _sectionTitle(context.l10n.sectionNote),
+      570                const SizedBox(height: 8),
+      571                TextFormField(
+      572                  controller: _noteController,
+      573 -                decoration: const InputDecoration(
+      574 -                  labelText: 'Not (istege bagli)',
+      575 -                  prefixIcon: Icon(Icons.note),
+      576 -                  hintText: 'Randevu ile ilgili notlar...',
+      573 +                decoration: InputDecoration(
+      574 +                  labelText: context.l10n.noteOptional,
+      575 +                  prefixIcon: const Icon(Icons.note),
+      576 +                  hintText: context.l10n.noteHint,
+      577                  ),
+      578                  maxLines: 3,
+      579                  textCapitalization: TextCapitalization.sentences,
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 4 lines, removed 4 lines
+      595                              color: Colors.white,
+      596                            ),
+      597                          )
+      598 -                      : const Row(
+      598 +                      : Row(
+      599                            mainAxisAlignment: MainAxisAlignment.center,
+      600                            children: [
+      601 -                            Icon(Icons.check_circle, size: 20),
+      602 -                            SizedBox(width: 8),
+      603 -                            Text('Randevuyu Kaydet'),
+      601 +                            const Icon(Icons.check_circle, size: 20),
+      602 +                            const SizedBox(width: 8),
+      603 +                            Text(context.l10n.saveAppointment),
+      604                            ],
+      605                          ),
+      606                  ),
+
+● PaymentDialog:
+
+● Update(lib\screens\appointment\payment_dialog.dart)
+  ⎿  Added 1 line
+      1  import 'package:flutter/material.dart';
+      2 +import '../../core/l10n/l10n_ext.dart';
+      3  import '../../core/theme/app_theme.dart';
+      4
+      5  /// Randevu tamamlanırken tahsil edilen tutar ve ödeme yöntemi.
+
+● Update(lib\screens\appointment\payment_dialog.dart)
+  ⎿  Added 13 lines, removed 13 lines
+      67      final debt = _debt;
+      68
+      69      return AlertDialog(
+      70 -      title: const Text('Ödeme Al'),
+      70 +      title: Text(context.l10n.takePayment),
+      71        content: Column(
+      72          mainAxisSize: MainAxisSize.min,
+      73          crossAxisAlignment: CrossAxisAlignment.start,
+     ...
+      78            ),
+      79            const SizedBox(height: 4),
+      80            Text(
+      81 -            'Randevu fiyatı: ${widget.appointmentPrice.toStringAsFixed(0)} ₺',
+      81 +            context.l10n.appointmentPriceInfo(widget.appointmentPrice.toStringAsFixed
+         +(0)),
+      82              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+      83            ),
+      84            const SizedBox(height: 16),
+     ...
+       88              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+       89              onChanged: (_) => setState(() {}),
+       90              decoration: InputDecoration(
+       91 -              labelText: 'Alınan tutar (₺)',
+       91 +              labelText: context.l10n.amountReceived,
+       92                prefixIcon: const Icon(Icons.payments),
+       93                helperText: debt > 0
+       94 -                  ? 'Kalan ${debt.toStringAsFixed(0)} ₺ borç yazılacak'
+       94 +                  ? context.l10n.remainingWillBeDebt(debt.toStringAsFixed(0))
+       95                    : null,
+       96                helperStyle: const TextStyle(color: AppTheme.warning),
+       97              ),
+       98            ),
+       99            const SizedBox(height: 16),
+      100 -          const Text('Ödeme Yöntemi', style: TextStyle(fontSize: 13)),
+      100 +          Text(context.l10n.paymentMethodLabel, style: const TextStyle(fontSize: 13)
+          +),
+      101            const SizedBox(height: 8),
+      102            SegmentedButton<String>(
+      103 -            segments: const [
+      103 +            segments: [
+      104                ButtonSegment(
+      105                  value: 'cash',
+      106 -                label: Text('Nakit'),
+      107 -                icon: Icon(Icons.account_balance_wallet),
+      106 +                label: Text(context.l10n.paymentCash),
+      107 +                icon: const Icon(Icons.account_balance_wallet),
+      108                ),
+      109                ButtonSegment(
+      110                  value: 'card',
+      111 -                label: Text('Kart'),
+      112 -                icon: Icon(Icons.credit_card),
+      111 +                label: Text(context.l10n.paymentCard),
+      112 +                icon: const Icon(Icons.credit_card),
+      113                ),
+      114              ],
+      115              selected: {_method},
+     ...
+      121        actions: [
+      122          TextButton(
+      123            onPressed: () => Navigator.pop(context),
+      124 -          child: const Text('İptal'),
+      124 +          child: Text(context.l10n.cancel),
+      125          ),
+      126          if (widget.appointmentPrice > 0)
+      127            TextButton(
+     ...
+      133                  debtAmount: widget.appointmentPrice,
+      134                ),
+      135              ),
+      136 -            child: const Text('Tümü Borç'),
+      136 +            child: Text(context.l10n.allAsDebt),
+      137            ),
+      138          ElevatedButton.icon(
+      139            onPressed: amount == null || amount < 0
+     ...
+      147                      ),
+      148                    ),
+      149            icon: const Icon(Icons.check, size: 18),
+      150 -          label: const Text('Tamamla'),
+      150 +          label: Text(context.l10n.complete),
+      151          ),
+      152        ],
+      153      );
+
+● PowerShell(cd D:\dosyalar\projeler\KolayRandevu\randevu360\mobile; flutter gen-l10n 2>&1 |
+            Select-Object -Last 3; flutter analyze 2>&1 | Select-Object -Last 5)
+  ⎿  Error: Exit code 1
+     To use the command line arguments, delete the l10n.yaml file in the Flutter project.
+
+
+     You can try the following suggestion to make the pubspec resolve:
+     * Try upgrading your constraint on intl: flutter pub add intl:^0.20.2
+     Failed to update packages.
+
+● PowerShell(cd D:\dosyalar\projeler\KolayRandevu\randevu360\mobile; flutter pub add intl:^0.20.2 2>&1
+            | Select-Object -Last 2; flutter gen-l10n 2>&1 | Select-Object -Last 3…)
+  ⎿  Error: Exit code 1
+     91 packages have newer versions incompatible with dependency constraints.
+     Try `flutter pub outdated` for more information.
+     To use the command line arguments, delete the l10n.yaml file in the Flutter project.
+
+
+        info - Don't use 'BuildContext's across async gaps -
+     lib\screens\appointment\new_appointment_screen.dart:264:18 - use_build_context_synchronously
+        info - Don't use 'BuildContext's across async gaps -
+     lib\screens\appointment\new_appointment_screen.dart:275:18 - use_build_context_synchronously
+        info - Don't use 'BuildContext's across async gaps -
+     lib\screens\appointment\new_appointment_screen.dart:282:18 - use_build_context_synchronously
+
+
+     … +7 lines (ctrl+o to expand)
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 3 lines, removed 1 line
+      239    /// Returns the customer ID by checking dropdown selection, looking up
+      240    /// by phone, or creating a new customer if none exists.
+      241    Future<int?> _resolveCustomer(int businessId) async {
+      242 +    final l10n = context.l10n;
+      243 +
+      244      // Use dropdown-selected customer directly
+      245      if (_selectedCustomerId != null && _selectedCustomerId! > 0) {
+      246        return _selectedCustomerId;
+     ...
+      248
+      249      final phone = _phoneController.text.trim();
+      250      if (phone.isEmpty) {
+      249 -      _showError(context.l10n.customerPhoneRequired);
+      251 +      _showError(l10n.customerPhoneRequired);
+      252        return null;
+      253      }
+      254
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      263      // No existing customer found — create a new one
+      264      final name = _nameController.text.trim();
+      265      if (name.isEmpty) {
+      266 -      _showError(context.l10n.customerNameRequired);
+      266 +      _showError(l10n.customerNameRequired);
+      267        return null;
+      268      }
+      269
+
+● Update(lib\screens\appointment\new_appointment_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      274      });
+      275
+      276      if (!created) {
+      277 -      _showError(context.l10n.customerCreateFailed);
+      277 +      _showError(l10n.customerCreateFailed);
+      278        return null;
+      279      }
+      280
+      281      // Look up the newly created customer to get its ID
+      282      final newCustomer = await customerProvider.getCustomerByPhone(phone);
+      283      if (newCustomer == null) {
+      284 -      _showError(context.l10n.customerCreateFailed);
+      284 +      _showError(l10n.customerCreateFailed);
+      285        return null;
+      286      }
+      287      return newCustomer['id'] as int;
+
+● İşletme ekranları:
+
+● Update(lib\screens\business\business_setup_screen.dart)
+  ⎿  Added 1 line
+      2  import 'package:provider/provider.dart';
+      3  import '../../providers/auth_provider.dart';
+      4  import '../../providers/business_provider.dart';
+      5 +import '../../core/l10n/l10n_ext.dart';
+      6  import '../../core/theme/app_theme.dart';
+      7
+      8  class BusinessSetupScreen extends StatefulWidget {
+
+● Update(lib\screens\business\business_setup_screen.dart)
+  ⎿  Added 6 lines, removed 3 lines
+      23    TimeOfDay _endTime = const TimeOfDay(hour: 19, minute: 0);
+      24
+      25    final List<String> _workingDays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      26 -  final Map<String, String> _dayNames = {
+      27 -    'mon': 'Pazartesi', 'tue': 'Salı', 'wed': 'Çarşamba',
+      28 -    'thu': 'Perşembe', 'fri': 'Cuma', 'sat': 'Cumartesi', 'sun': 'Pazar',
+      26 +
+      27 +  Map<String, String> _dayNames(BuildContext context) => {
+      28 +    'mon': context.l10n.dayMon, 'tue': context.l10n.dayTue,
+      29 +    'wed': context.l10n.dayWed, 'thu': context.l10n.dayThu,
+      30 +    'fri': context.l10n.dayFri, 'sat': context.l10n.daySat,
+      31 +    'sun': context.l10n.daySun,
+      32    };
+      33
+      34    @override
+
+● Update(lib\screens\business\business_setup_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      44    Widget build(BuildContext context) {
+      45      return Scaffold(
+      46        appBar: AppBar(
+      47 -        title: const Text('İşletmeni Tanımla'),
+      47 +        title: Text(context.l10n.defineBusiness),
+      48        ),
+      49        body: SingleChildScrollView(
+      50          padding: const EdgeInsets.all(24),
+
+● Update(lib\screens\business\business_setup_screen.dart)
+  ⎿  Added 8 lines, removed 8 lines
+      60                    color: AppTheme.primary.withValues(alpha: 0.1),
+      61                    borderRadius: BorderRadius.circular(16),
+      62                  ),
+      63 -                child: const Row(
+      63 +                child: Row(
+      64                    children: [
+      65 -                    Icon(Icons.store, color: AppTheme.primary, size: 32),
+      66 -                    SizedBox(width: 16),
+      65 +                    const Icon(Icons.store, color: AppTheme.primary, size: 32),
+      66 +                    const SizedBox(width: 16),
+      67                      Expanded(
+      68                        child: Column(
+      69                          crossAxisAlignment: CrossAxisAlignment.start,
+      70                          children: [
+      71                            Text(
+      72 -                            'İşletme Bilgileri',
+      73 -                            style: TextStyle(
+      72 +                            context.l10n.businessInfoTitle,
+      73 +                            style: const TextStyle(
+      74                                fontSize: 18,
+      75                                fontWeight: FontWeight.bold,
+      76                              ),
+      77                            ),
+      78 -                          SizedBox(height: 4),
+      78 +                          const SizedBox(height: 4),
+      79                            Text(
+      80 -                            'Randevu 360\'ı kullanmak için işletmenizi tanımlayın',
+      81 -                            style: TextStyle(
+      80 +                            context.l10n.businessSetupSubtitle,
+      81 +                            style: const TextStyle(
+      82                                fontSize: 13,
+      83                                color: AppTheme.textSecondary,
+      84                              ),
+
+● Update(lib\screens\business\business_setup_screen.dart)
+  ⎿  Added 24 lines, removed 24 lines
+       94                // Business Name
+       95                TextFormField(
+       96                  controller: _nameController,
+       97 -                decoration: const InputDecoration(
+       98 -                  labelText: 'İşletme Adı',
+       99 -                  prefixIcon: Icon(Icons.store),
+       97 +                decoration: InputDecoration(
+       98 +                  labelText: context.l10n.businessNameField,
+       99 +                  prefixIcon: const Icon(Icons.store),
+      100                  ),
+      101 -                validator: (v) => v?.isEmpty ?? true ? 'İşletme adı gerekli' : null,
+      101 +                validator: (v) => v?.isEmpty ?? true ? context.l10n.businessNameRequ
+          +ired : null,
+      102                ),
+      103                const SizedBox(height: 16),
+      104
+      105                // Phone
+      106                TextFormField(
+      107                  controller: _phoneController,
+      108 -                decoration: const InputDecoration(
+      109 -                  labelText: 'Telefon',
+      110 -                  prefixIcon: Icon(Icons.phone),
+      108 +                decoration: InputDecoration(
+      109 +                  labelText: context.l10n.phoneOnlyField,
+      110 +                  prefixIcon: const Icon(Icons.phone),
+      111                    hintText: '05XX XXX XX XX',
+      112                  ),
+      113                  keyboardType: TextInputType.phone,
+      114 -                validator: (v) => v?.isEmpty ?? true ? 'Telefon gerekli' : null,
+      114 +                validator: (v) => v?.isEmpty ?? true ? context.l10n.phoneRequired :
+          +null,
+      115                ),
+      116                const SizedBox(height: 16),
+      117
+      118                // Address
+      119                TextFormField(
+      120                  controller: _addressController,
+      121 -                decoration: const InputDecoration(
+      122 -                  labelText: 'Adres',
+      123 -                  prefixIcon: Icon(Icons.location_on),
+      121 +                decoration: InputDecoration(
+      122 +                  labelText: context.l10n.addressField,
+      123 +                  prefixIcon: const Icon(Icons.location_on),
+      124                  ),
+      125                  maxLines: 2,
+      126                ),
+     ...
+      129                // Email
+      130                TextFormField(
+      131                  controller: _emailController,
+      132 -                decoration: const InputDecoration(
+      133 -                  labelText: 'E-posta',
+      134 -                  prefixIcon: Icon(Icons.email),
+      132 +                decoration: InputDecoration(
+      133 +                  labelText: context.l10n.emailField,
+      134 +                  prefixIcon: const Icon(Icons.email),
+      135                  ),
+      136                  keyboardType: TextInputType.emailAddress,
+      137                  validator: (v) {
+      138                    if (v != null && v.isNotEmpty && !v.contains('@')) {
+      139 -                    return 'Geçerli bir e-posta girin';
+      139 +                    return context.l10n.emailInvalid;
+      140                    }
+      141                    return null;
+      142                  },
+     ...
+      144                const SizedBox(height: 24),
+      145
+      146                // Working Hours
+      147 -              const Text(
+      148 -                'Çalışma Saatleri',
+      149 -                style: TextStyle(
+      147 +              Text(
+      148 +                context.l10n.workingHoursTitle,
+      149 +                style: const TextStyle(
+      150                    fontSize: 16,
+      151                    fontWeight: FontWeight.w600,
+      152                  ),
+     ...
+      156                  children: [
+      157                    Expanded(
+      158                      child: _TimePickerTile(
+      159 -                      label: 'Açılış',
+      159 +                      label: context.l10n.opening,
+      160                        time: _startTime,
+      161                        onTap: () => _pickTime(true),
+      162                      ),
+     ...
+      167                    ),
+      168                    Expanded(
+      169                      child: _TimePickerTile(
+      170 -                      label: 'Kapanış',
+      170 +                      label: context.l10n.closing,
+      171                        time: _endTime,
+      172                        onTap: () => _pickTime(false),
+      173                      ),
+     ...
+      177                const SizedBox(height: 24),
+      178
+      179                // Working Days
+      180 -              const Text(
+      181 -                'Çalışma Günleri',
+      182 -                style: TextStyle(
+      180 +              Text(
+      181 +                context.l10n.workingDaysTitle,
+      182 +                style: const TextStyle(
+      183                    fontSize: 16,
+      184                    fontWeight: FontWeight.w600,
+      185                  ),
+     ...
+      188                Wrap(
+      189                  spacing: 8,
+      190                  runSpacing: 8,
+      191 -                children: _dayNames.entries.map((entry) {
+      191 +                children: _dayNames(context).entries.map((entry) {
+      192                    final selected = _workingDays.contains(entry.key);
+      193                    return FilterChip(
+      194                      label: Text(entry.value),
+
+● Update(lib\screens\business\business_setup_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      221                            : () => _saveBusiness(context),
+      222                        child: provider.isLoading
+      223                            ? const CircularProgressIndicator(color: Colors.white)
+      224 -                          : const Text('Kaydet ve Başla'),
+      224 +                          : Text(context.l10n.saveAndStart),
+      225                      ),
+      226                    );
+      227                  },
+
+● Update(lib\screens\business\business_info_screen.dart)
+  ⎿  Added 1 line
+      2  import 'package:provider/provider.dart';
+      3  import '../../providers/business_provider.dart';
+      4  import '../../providers/auth_provider.dart';
+      5 +import '../../core/l10n/l10n_ext.dart';
+      6  import '../../core/theme/app_theme.dart';
+      7
+      8  class BusinessInfoScreen extends StatefulWidget {
+
+● Update(lib\screens\business\business_info_screen.dart)
+  ⎿  Added 2 lines, removed 1 line
+      49      if (!_formKey.currentState!.validate()) return;
+      50
+      51      setState(() => _isSaving = true);
+      52 +    final l10n = context.l10n;
+      53
+      54      final businessProvider = context.read<BusinessProvider>();
+      55      final current = businessProvider.business;
+      56      if (current == null) {
+      56 -      _showError('İşletme bilgisi bulunamadı');
+      57 +      _showError(l10n.businessInfoNotFound);
+      58        setState(() => _isSaving = false);
+      59        return;
+      60      }
+
+● Update(lib\screens\business\business_info_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      75
+      76      if (success) {
+      77        ScaffoldMessenger.of(context).showSnackBar(
+      78 -        const SnackBar(content: Text('İşletme bilgileri güncellendi'), backgroundColo
+         -r: AppTheme.success),
+      78 +        SnackBar(content: Text(l10n.businessInfoUpdated), backgroundColor: AppTheme.s
+         +uccess),
+      79        );
+      80        Navigator.pop(context);
+      81      } else {
+      82 -      _showError(businessProvider.error ?? 'Güncelleme başarısız');
+      82 +      _showError(businessProvider.error ?? l10n.updateFailed);
+      83      }
+      84    }
+      85
+
+● Update(lib\screens\business\business_info_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+       95      final isAdmin = context.watch<AuthProvider>().isAdmin;
+       96
+       97      return Scaffold(
+       98 -      appBar: AppBar(title: const Text('İşletme Bilgileri')),
+       98 +      appBar: AppBar(title: Text(context.l10n.businessInfoTitle)),
+       99        body: SingleChildScrollView(
+      100          padding: const EdgeInsets.all(24),
+      101          child: Form(
+
+● Update(lib\screens\business\business_info_screen.dart)
+  ⎿  Added 5 lines, removed 5 lines
+      110                      color: AppTheme.textSecondary.withValues(alpha: 0.08),
+      111                      borderRadius: BorderRadius.circular(12),
+      112                    ),
+      113 -                  child: const Row(
+      113 +                  child: Row(
+      114                      children: [
+      115 -                      Icon(Icons.lock_outline, size: 20, color: AppTheme.textSeconda
+          -ry),
+      116 -                      SizedBox(width: 8),
+      115 +                      const Icon(Icons.lock_outline, size: 20, color: AppTheme.textS
+          +econdary),
+      116 +                      const SizedBox(width: 8),
+      117                        Expanded(
+      118                          child: Text(
+      119 -                          'Bu bilgileri yalnızca işletme sahibi değiştirebilir.',
+      120 -                          style: TextStyle(color: AppTheme.textSecondary, fontSize:
+          -13),
+      119 +                          context.l10n.onlyOwnerCanEdit,
+      120 +                          style: const TextStyle(color: AppTheme.textSecondary, font
+          +Size: 13),
+      121                          ),
+      122                        ),
+      123                      ],
+
+● Update(lib\screens\business\business_info_screen.dart)
+  ⎿  Added 8 lines, removed 8 lines
+      128                TextFormField(
+      129                  controller: _nameController,
+      130                  enabled: isAdmin,
+      131 -                decoration: const InputDecoration(labelText: 'İşletme Adı', prefixIc
+          -on: Icon(Icons.store)),
+      132 -                validator: (v) => v?.isEmpty ?? true ? 'İşletme adı gerekli' : null,
+      131 +                decoration: InputDecoration(labelText: context.l10n.businessNameFiel
+          +d, prefixIcon: const Icon(Icons.store)),
+      132 +                validator: (v) => v?.isEmpty ?? true ? context.l10n.businessNameRequ
+          +ired : null,
+      133                ),
+      134                const SizedBox(height: 16),
+      135                TextFormField(
+      136                  controller: _phoneController,
+      137                  enabled: isAdmin,
+      138 -                decoration: const InputDecoration(labelText: 'Telefon', prefixIcon:
+          -Icon(Icons.phone), hintText: '05XX XXX XX XX'),
+      138 +                decoration: InputDecoration(labelText: context.l10n.phoneOnlyField,
+          +prefixIcon: const Icon(Icons.phone), hintText: '05XX XXX XX XX'),
+      139                  keyboardType: TextInputType.phone,
+      140 -                validator: (v) => v?.isEmpty ?? true ? 'Telefon gerekli' : null,
+          -on(Icons.location_on)),
+      146 +                decoration: InputDecoration(labelText: context.l10n.addressField, pr
+          +efixIcon: const Icon(Icons.location_on)),
+      147                  maxLines: 2,
+      148                ),
+      149                const SizedBox(height: 16),
+      150                TextFormField(
+      151                  controller: _emailController,
+      152                  enabled: isAdmin,
+      153 -                decoration: const InputDecoration(labelText: 'E-posta', prefixIcon:
+          -Icon(Icons.email)),
+      153 +                decoration: InputDecoration(labelText: context.l10n.emailField, pref
+          +ixIcon: const Icon(Icons.email)),
+      154                  keyboardType: TextInputType.emailAddress,
+      155                  validator: (v) {
+      156 -                  if (v != null && v.isNotEmpty && !v.contains('@')) return 'Geçerli
+          - bir e-posta girin';
+      156 +                  if (v != null && v.isNotEmpty && !v.contains('@')) return context.
+          +l10n.emailInvalid;
+      157                    return null;
+      158                  },
+      159                ),
+     ...
+      165                      onPressed: _isSaving ? null : _save,
+      166                      child: _isSaving
+      167                          ? const CircularProgressIndicator(color: Colors.white)
+      168 -                        : const Text('Kaydet'),
+      168 +                        : Text(context.l10n.save),
+      169                    ),
+      170                  ),
+      171                ],
+
+● Update(lib\screens\business\working_hours_screen.dart)
+  ⎿  Added 1 line
+      2  import 'package:flutter/material.dart';
+      3  import 'package:provider/provider.dart';
+      4  import '../../providers/business_provider.dart';
+      5 +import '../../core/l10n/l10n_ext.dart';
+      6  import '../../core/theme/app_theme.dart';
+      7
+      8  class WorkingHoursScreen extends StatefulWidget {
+
+● Update(lib\screens\business\working_hours_screen.dart)
+  ⎿  Added 5 lines, removed 3 lines
+      18    List<String> _workingDays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      19    bool _isSaving = false;
+      20
+      21 -  static const Map<String, String> _dayNames = {
+      22 -    'mon': 'Pazartesi', 'tue': 'Salı', 'wed': 'Çarşamba',
+      23 -    'thu': 'Perşembe', 'fri': 'Cuma', 'sat': 'Cumartesi', 'sun': 'Pazar',
+      21 +  Map<String, String> _dayNames(BuildContext context) => {
+      22 +    'mon': context.l10n.dayMon, 'tue': context.l10n.dayTue,
+      23 +    'wed': context.l10n.dayWed, 'thu': context.l10n.dayThu,
+      24 +    'fri': context.l10n.dayFri, 'sat': context.l10n.daySat,
+      25 +    'sun': context.l10n.daySun,
+      26    };
+      27
+      28    @override
+
+● Update(lib\screens\business\working_hours_screen.dart)
+  ⎿  Added 1 line
+      67
+      68    Future<void> _save() async {
+      69      setState(() => _isSaving = true);
+      70 +    final l10n = context.l10n;
+      71
+      72      final businessProvider = context.read<BusinessProvider>();
+      73      final current = businessProvider.business;
+
+● Update(lib\screens\business\working_hours_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+       92
+       93      if (success) {
+       94        ScaffoldMessenger.of(context).showSnackBar(
+       95 -        const SnackBar(content: Text('Çalışma saatleri güncellendi'), backgroundColo
+          -r: AppTheme.success),
+       95 +        SnackBar(content: Text(l10n.workingHoursUpdated), backgroundColor: AppTheme.
+          +success),
+       96        );
+       97        Navigator.pop(context);
+       98      } else {
+       99        ScaffoldMessenger.of(context).showSnackBar(
+      100 -        SnackBar(content: Text(businessProvider.error ?? 'Güncelleme başarısız'), ba
+          -ckgroundColor: AppTheme.error),
+      100 +        SnackBar(content: Text(businessProvider.error ?? l10n.updateFailed), backgro
+          +undColor: AppTheme.error),
+      101        );
+      102      }
+      103    }
+
+● Update(lib\screens\business\working_hours_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      105    @override
+      106    Widget build(BuildContext context) {
+      107      return Scaffold(
+      108 -      appBar: AppBar(title: const Text('Çalışma Saatleri')),
+      108 +      appBar: AppBar(title: Text(context.l10n.workingHoursTitle)),
+      109        body: SingleChildScrollView(
+      110          padding: const EdgeInsets.all(24),
+      111          child: Column(
+
+● Update(lib\screens\business\working_hours_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      111          child: Column(
+      112            crossAxisAlignment: CrossAxisAlignment.start,
+      113            children: [
+      114 -            const Text('Çalışma Saatleri', style: TextStyle(fontSize: 16, fontWeight
+          -: FontWeight.w600)),
+      114 +            Text(context.l10n.workingHoursTitle, style: const TextStyle(fontSize: 16
+          +, fontWeight: FontWeight.w600)),
+      115              const SizedBox(height: 12),
+      116              Row(
+      117                children: [
+
+● Update(lib\screens\business\working_hours_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      120                      onTap: () => _pickTime(true),
+      121                      borderRadius: BorderRadius.circular(12),
+      122                      child: InputDecorator(
+      123 -                      decoration: const InputDecoration(labelText: 'Açılış', prefixI
+          -con: Icon(Icons.wb_sunny)),
+      123 +                      decoration: InputDecoration(labelText: context.l10n.opening, p
+          +refixIcon: const Icon(Icons.wb_sunny)),
+      124                        child: Text(_startTime.format(context), style: const TextStyle
+           (fontSize: 18, fontWeight: FontWeight.w600)),
+      125                      ),
+      126                    ),
+
+● Update(lib\screens\business\working_hours_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      134                      onTap: () => _pickTime(false),
+      135                      borderRadius: BorderRadius.circular(12),
+      136                      child: InputDecorator(
+      137 -                      decoration: const InputDecoration(labelText: 'Kapanış', prefix
+          -Icon: Icon(Icons.nights_stay)),
+      137 +                      decoration: InputDecoration(labelText: context.l10n.closing, p
+          +refixIcon: const Icon(Icons.nights_stay)),
+      138                        child: Text(_endTime.format(context), style: const TextStyle(f
+           ontSize: 18, fontWeight: FontWeight.w600)),
+      139                      ),
+      140                    ),
+
+● Update(lib\screens\business\working_hours_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      142                ],
+      143              ),
+      144              const SizedBox(height: 32),
+      145 -            const Text('Çalışma Günleri', style: TextStyle(fontSize: 16, fontWeight:
+          - FontWeight.w600)),
+      145 +            Text(context.l10n.workingDaysTitle, style: const TextStyle(fontSize: 16,
+          + fontWeight: FontWeight.w600)),
+      146              const SizedBox(height: 12),
+      147              Wrap(
+      148                spacing: 8,
+      149                runSpacing: 8,
+      150 -              children: _dayNames.entries.map((entry) {
+      150 +              children: _dayNames(context).entries.map((entry) {
+      151                  final selected = _workingDays.contains(entry.key);
+      152                  return FilterChip(
+      153                    label: Text(entry.value),
+
+● Update(lib\screens\business\working_hours_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      168                width: double.infinity,
+      169                child: ElevatedButton(
+      170                  onPressed: _isSaving ? null : _save,
+      171 -                child: _isSaving ? const CircularProgressIndicator(color: Colors.whi
+          -te) : const Text('Kaydet'),
+      171 +                child: _isSaving ? const CircularProgressIndicator(color: Colors.whi
+          +te) : Text(context.l10n.save),
+      172                ),
+      173              ),
+      174            ],
+
+● Update(lib\screens\finance\finance_screen.dart)
+  ⎿  Added 2 lines
+      1  import 'package:flutter/material.dart';
+      2 +import 'package:intl/intl.dart';
+      3  import 'package:provider/provider.dart';
+      4  import '../../providers/business_provider.dart';
+      5  import '../../providers/finance_provider.dart';
+      6 +import '../../core/l10n/l10n_ext.dart';
+      7  import '../../core/theme/app_theme.dart';
+      8  import 'debtors_screen.dart';
+      9  import 'finance_stats_screen.dart';
+
+● Update(lib\screens\finance\finance_screen.dart)
+  ⎿  Removed 5 lines
+      17  }
+      18
+      19  class _FinanceScreenState extends State<FinanceScreen> {
+      20 -  static const List<String> _monthNames = [
+      21 -    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+      22 -    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
+      23 -  ];
+      24 -
+      20    @override
+      21    void initState() {
+      22      super.initState();
+
+● Update(lib\screens\finance\finance_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      49    Widget build(BuildContext context) {
+      50      return Scaffold(
+      51        appBar: AppBar(
+      52 -        title: const Text('Finans'),
+      52 +        title: Text(context.l10n.financeTitle),
+      53          actions: [
+      54            IconButton(
+      55              icon: const Icon(Icons.insert_chart_outlined),
+      56 -            tooltip: 'İstatistikler',
+      56 +            tooltip: context.l10n.statisticsTooltip,
+      57              onPressed: () => Navigator.push(context,
+      58                  MaterialPageRoute(builder: (_) => const FinanceStatsScreen())),
+      59            ),
+
+● Update(lib\screens\finance\finance_screen.dart)
+  ⎿  Added 2 lines, removed 1 line
+      86                            ),
+      87                            const SizedBox(width: 12),
+      88                            Text(
+      89 -                            '${_monthNames[provider.selectedMonth - 1]} ${provider.se
+         -lectedYear}',
+      89 +                            DateFormat('MMMM yyyy', Localizations.localeOf(context).t
+         +oString())
+      90 +                                .format(DateTime(provider.selectedYear, provider.sele
+         +ctedMonth)),
+      91                              style: const TextStyle(color: AppTheme.textSecondary, fon
+          tWeight: FontWeight.w600),
+      92                            ),
+      93                            const SizedBox(width: 12),
+
+● Update(lib\screens\finance\finance_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      100                          ],
+      101                        ),
+      102                        const SizedBox(height: 12),
+      103 -                      const Text('Aylık Bilanço', style: TextStyle(color: AppTheme.t
+          -extSecondary)),
+      103 +                      Text(context.l10n.monthlyBalance, style: const TextStyle(color
+          +: AppTheme.textSecondary)),
+      104                        const SizedBox(height: 8),
+      105                        Text(
+      106                          '${provider.balance.toStringAsFixed(0)} ₺',
+
+● Update(lib\screens\finance\finance_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      110                        Row(
+      111                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      112                          children: [
+      113 -                          _amountColumn('Gelir', provider.totalIncome, AppTheme.succ
+          -ess),
+      114 -                          _amountColumn('Gider', provider.totalExpense, AppTheme.err
+          -or),
+      113 +                          _amountColumn(context.l10n.income, provider.totalIncome, A
+          +ppTheme.success),
+      114 +                          _amountColumn(context.l10n.expense, provider.totalExpense,
+          + AppTheme.error),
+      115                          ],
+      116                        ),
+      117                      ],
+
+● Update(lib\screens\finance\finance_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      123                // Quick stats
+      124                Row(
+      125                  children: [
+      126 -                  Expanded(child: _miniStatCard('Bu Hafta', _weeklyIncome(provider),
+          - AppTheme.primary)),
+      126 +                  Expanded(child: _miniStatCard(context.l10n.thisWeek, _weeklyIncome
+          +(provider), AppTheme.primary)),
+      127                    const SizedBox(width: 8),
+      128                    Expanded(
+      129                      child: _miniStatCard(
+      130 -                      'Alacaklar (${provider.debtors.length})',
+      130 +                      context.l10n.receivablesLabel(provider.debtors.length),
+      131                        '${provider.totalDebtRemaining.toStringAsFixed(0)} ₺',
+      132                        AppTheme.warning,
+      133                        onTap: () => Navigator.push(
+
+● Update(lib\screens\finance\finance_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      144                Row(
+      145                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      146                  children: [
+      147 -                  const Text('Son İşlemler', style: TextStyle(fontSize: 18, fontWeig
+          -ht: FontWeight.w600)),
+      147 +                  Text(context.l10n.recentTransactions, style: const TextStyle(fontS
+          +ize: 18, fontWeight: FontWeight.w600)),
+      148                    TextButton(
+      149                      onPressed: () => Navigator.push(context, MaterialPageRoute(build
+           er: (_) => const TransactionListScreen())),
+      150 -                    child: const Text('Tümü'),
+      150 +                    child: Text(context.l10n.viewAllShort),
+      151                    ),
+      152                  ],
+      153                ),
+
+● Update(lib\screens\finance\finance_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      240      final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.'));
+      241      if (amount == null || amount <= 0) {
+      242        ScaffoldMessenger.of(context).showSnackBar(
+      243 -        const SnackBar(content: Text('Geçerli bir tutar girin')),
+      243 +        SnackBar(content: Text(context.l10n.enterValidAmount)),
+      244        );
+      245        return;
+      246      }
+
+● Update(lib\screens\finance\finance_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      255      final category = _category ??
+      256          (names.isNotEmpty
+      257              ? names.first
+      258 -            : (_type == 'income' ? 'Diğer Gelir' : 'Diğer Gider'));
+      258 +            : (_type == 'income' ? context.l10n.otherIncome : context.l10n.otherExpe
+          +nse));
+      259
+      260      financeProvider.addTransaction({
+      261        'businessId': bizProv.business!['id'],
+
+● Update(lib\screens\finance\finance_screen.dart)
+  ⎿  Added 4 lines, removed 4 lines
+      285        child: Column(
+      286          mainAxisSize: MainAxisSize.min,
+      287          children: [
+      288 -          const Text('Gelir/Gider Ekle', style: TextStyle(fontSize: 18, fontWeight:
+          -FontWeight.bold)),
+      288 +          Text(context.l10n.addIncomeExpense, style: const TextStyle(fontSize: 18, f
+          +ontWeight: FontWeight.bold)),
+      289            const SizedBox(height: 24),
+      290            // Type toggle
+      291            SegmentedButton<String>(
+      292 -            segments: const [
+      293 -              ButtonSegment(value: 'income', label: Text('Gelir'), icon: Icon(Icons.
+          -arrow_upward)),
+      294 -              ButtonSegment(value: 'expense', label: Text('Gider'), icon: Icon(Icons
+          -.arrow_downward)),
+      292 +            segments: [
+      293 +              ButtonSegment(value: 'income', label: Text(context.l10n.income), icon:
+          + const Icon(Icons.arrow_upward)),
+      294 +              ButtonSegment(value: 'expense', label: Text(context.l10n.expense), ico
+          +n: const Icon(Icons.arrow_downward)),
+      295              ],
+      296              selected: {_type},
+      297              onSelectionChanged: (v) => setState(() {
+
+● Update(lib\screens\finance\finance_screen.dart)
+  ⎿  Added 9 lines, removed 9 lines
+      302            const SizedBox(height: 16),
+      303            TextField(
+      304              controller: _amountCtrl,
+      305 -            decoration: const InputDecoration(labelText: 'Tutar (TL)'),
+      305 +            decoration: InputDecoration(labelText: context.l10n.amountField),
+      306              keyboardType: TextInputType.number,
+      307            ),
+      308            const SizedBox(height: 16),
+      309            DropdownButtonFormField<String>(
+      310              key: ValueKey('category_$_type'),
+      311              initialValue: selected,
+      312 -            decoration: const InputDecoration(labelText: 'Kategori'),
+      312 +            decoration: InputDecoration(labelText: context.l10n.categoryField),
+      313              items: names
+      314                  .map((n) => DropdownMenuItem(value: n, child: Text(n)))
+      315                  .toList(),
+     ...
+      318            const SizedBox(height: 16),
+      319            TextField(
+      320              controller: _descCtrl,
+      321 -            decoration: const InputDecoration(labelText: 'Açıklama'),
+      321 +            decoration: InputDecoration(labelText: context.l10n.descriptionField),
+      322            ),
+      323            const SizedBox(height: 16),
+      324            DropdownButtonFormField<String>(
+      325              initialValue: _paymentMethod,
+      326 -            decoration: const InputDecoration(labelText: 'Ödeme Yöntemi'),
+      327 -            items: const [
+      328 -              DropdownMenuItem(value: 'cash', child: Text('Nakit')),
+      329 -              DropdownMenuItem(value: 'card', child: Text('Kart')),
+      330 -              DropdownMenuItem(value: 'transfer', child: Text('Havale')),
+      326 +            decoration: InputDecoration(labelText: context.l10n.paymentMethodLabel),
+      327 +            items: [
+      328 +              DropdownMenuItem(value: 'cash', child: Text(context.l10n.paymentCash))
+          +,
+      329 +              DropdownMenuItem(value: 'card', child: Text(context.l10n.paymentCard))
+          +,
+      330 +              DropdownMenuItem(value: 'transfer', child: Text(context.l10n.paymentTr
+          +ansfer)),
+      331              ],
+      332              onChanged: (v) => setState(() => _paymentMethod = v ?? 'cash'),
+      333            ),
+     ...
+      336              width: double.infinity,
+      337              child: ElevatedButton(
+      338                onPressed: _save,
+      339 -              child: const Text('Kaydet'),
+      339 +              child: Text(context.l10n.save),
+      340              ),
+      341            ),
+      342            const SizedBox(height: 24),
+
+● Transaction list + debtors:
+
+● Update(lib\screens\finance\transaction_list_screen.dart)
+  ⎿  Added 1 line
+      2  import 'package:provider/provider.dart';
+      3  import '../../providers/finance_provider.dart';
+      4  import '../../providers/business_provider.dart';
+      5 +import '../../core/l10n/l10n_ext.dart';
+      6  import '../../core/theme/app_theme.dart';
+      7
+      8  class TransactionListScreen extends StatefulWidget {
+
+● Update(lib\screens\finance\transaction_list_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      32    Widget build(BuildContext context) {
+      33      return Scaffold(
+      34        appBar: AppBar(
+      35 -        title: const Text('Tüm İşlemler'),
+      35 +        title: Text(context.l10n.allTransactions),
+      36          actions: [
+      37            IconButton(
+      38              icon: const Icon(Icons.add),
+
+● Update(lib\screens\finance\transaction_list_screen.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      59                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      60                  child: Row(
+      61                    children: [
+      62 -                    _FilterChip('Tümü', 'all', _filter, (v) => setState(() => _filter
+         - = v)),
+      62 +                    _FilterChip(context.l10n.all, 'all', _filter, (v) => setState(()
+         +=> _filter = v)),
+      63                      const SizedBox(width: 8),
+      64 -                    _FilterChip('Gelirler', 'income', _filter, (v) => setState(() =>
+         -_filter = v)),
+      64 +                    _FilterChip(context.l10n.incomes, 'income', _filter, (v) => setSt
+         +ate(() => _filter = v)),
+      65                      const SizedBox(width: 8),
+      66 -                    _FilterChip('Giderler', 'expense', _filter, (v) => setState(() =>
+         - _filter = v)),
+      66 +                    _FilterChip(context.l10n.expenses, 'expense', _filter, (v) => set
+         +State(() => _filter = v)),
+      67                    ],
+      68                  ),
+      69                ),
+
+● Update(lib\screens\finance\transaction_list_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      78                            children: [
+      79                              Icon(Icons.receipt_long, size: 64, color: Colors.grey[400
+          ]),
+      80                              const SizedBox(height: 12),
+      81 -                            const Text('İşlem bulunamadı', style: TextStyle(color: Ap
+         -pTheme.textSecondary)),
+      81 +                            Text(context.l10n.noTransactionsFound, style: const TextS
+         +tyle(color: AppTheme.textSecondary)),
+      82                            ],
+      83                          ),
+      84                        )
+
+● Update(lib\screens\finance\transaction_list_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      104                                    if (tx['description'] != null && (tx['description'
+           ] as String).isNotEmpty)
+      105                                      Text(tx['description'], style: const TextStyle(f
+           ontSize: 12)),
+      106                                    Text(
+      107 -                                    '${tx['date'] ?? ''} • ${_paymentLabel(tx['payme
+          -ntMethod'])}',
+      107 +                                    '${tx['date'] ?? ''} • ${_paymentLabel(context,
+          +tx['paymentMethod'])}',
+      108                                      style: const TextStyle(fontSize: 11, color: AppT
+           heme.textSecondary),
+      109                                    ),
+      110                                  ],
+
+● Update(lib\screens\finance\transaction_list_screen.dart)
+  ⎿  Added 4 lines, removed 4 lines
+      129      );
+      130    }
+      131
+      132 -  String _paymentLabel(String? method) {
+      132 +  String _paymentLabel(BuildContext context, String? method) {
+      133      switch (method) {
+      134 -      case 'card': return 'Kart';
+      135 -      case 'transfer': return 'Havale';
+      136 -      default: return 'Nakit';
+      134 +      case 'card': return context.l10n.paymentCard;
+      135 +      case 'transfer': return context.l10n.paymentTransfer;
+      136 +      default: return context.l10n.paymentCash;
+      137      }
+      138    }
+      139  }
+
+● Update(lib\screens\finance\debtors_screen.dart)
+  ⎿  Added 1 line
+       5  import '../../providers/business_provider.dart';
+       6  import '../../providers/finance_provider.dart';
+       7  import '../../providers/whatsapp_provider.dart';
+       8 +import '../../core/l10n/l10n_ext.dart';
+       9  import '../../core/theme/app_theme.dart';
+      10  import '../../services/debt_sync.dart';
+      11
+
+● Update(lib\screens\finance\debtors_screen.dart)
+  ⎿  Added 1 line
+      56
+      57    Future<void> _sendReminderNow(Map<String, dynamic> debtor) async {
+      58      final messenger = ScaffoldMessenger.of(context);
+      59 +    final l10n = context.l10n;
+      60      final business = context.read<BusinessProvider>().business;
+      61      if (business == null) return;
+      62
+
+● Update(lib\screens\finance\debtors_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      74      messenger.showSnackBar(
+      75        SnackBar(
+      76          content: Text(ok
+      77 -            ? 'Hatırlatma gönderildi: ${debtor['name']}'
+      78 -            : 'Hatırlatma gönderilemedi (WhatsApp bağlantısını kontrol edin)'),
+      77 +            ? l10n.reminderSentTo(debtor['name'] as String)
+      78 +            : l10n.reminderSendFailed),
+      79          backgroundColor: ok ? AppTheme.success : AppTheme.error,
+      80        ),
+      81      );
+
+● Update(lib\screens\finance\debtors_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      84    @override
+      85    Widget build(BuildContext context) {
+      86      return Scaffold(
+      87 -      appBar: AppBar(title: const Text('Borçlu Müşteriler')),
+      87 +      appBar: AppBar(title: Text(context.l10n.debtorCustomers)),
+      88        body: Consumer<FinanceProvider>(
+      89          builder: (context, provider, _) {
+      90            final debtors = provider.debtors;
+
+● Update(lib\screens\finance\debtors_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+       97                    Icon(Icons.task_alt, size: 64, color: Colors.grey[400]),
+       98                    const SizedBox(height: 12),
+       99                    Text(
+      100 -                    'Borcu olan müşteri yok',
+      100 +                    context.l10n.noDebtors,
+      101                      style: TextStyle(color: Colors.grey[600]),
+      102                    ),
+      103                  ],
+
+● Update(lib\screens\finance\debtors_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      117                  ),
+      118                  child: Column(
+      119                    children: [
+      120 -                    const Text('Toplam Alacak',
+      121 -                        style: TextStyle(color: AppTheme.textSecondary)),
+      120 +                    Text(context.l10n.totalReceivable,
+      121 +                        style: const TextStyle(color: AppTheme.textSecondary)),
+      122                      const SizedBox(height: 4),
+      123                      Text(
+      124                        '${provider.totalDebtRemaining.toStringAsFixed(0)} ₺',
+
+● Update(lib\screens\finance\debtors_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      129                        ),
+      130                      ),
+      131                      Text(
+      132 -                      '${debtors.length} müşteri',
+      132 +                      context.l10n.customersCountShort(debtors.length),
+      133                        style: const TextStyle(
+      134                            color: AppTheme.textSecondary, fontSize: 13),
+      135                      ),
+
+● Update(lib\screens\finance\debtors_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      154                          ),
+      155                          title: Text(debtor['name'] as String),
+      156                          subtitle: Text(
+      157 -                          '${debtor['openDebts']} açık borç'
+      158 -                          '${phone.isNotEmpty ? ' • $phone' : ''}',
+      157 +                          context.l10n.openDebtCount(debtor['openDebts'] as int) +
+      158 +                              (phone.isNotEmpty ? ' • $phone' : ''),
+      159                            style: const TextStyle(fontSize: 12),
+      160                          ),
+      161                          trailing: Row(
+
+● Update(lib\screens\finance\debtors_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      173                                IconButton(
+      174                                  icon: const Icon(Icons.chat,
+      175                                      color: AppTheme.success),
+      176 -                                tooltip: 'WhatsApp ile hatırlat',
+      176 +                                tooltip: context.l10n.remindViaWhatsApp,
+      177                                  onPressed: () => _sendReminderNow(debtor),
+      178                                ),
+      179                            ],
+
+● Update(lib\screens\finance\debtors_screen.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      225
+      226    Future<void> _save() async {
+      227      final messenger = ScaffoldMessenger.of(context);
+      228 +    final l10n = context.l10n;
+      229      final amount =
+      230          double.tryParse(_amountCtrl.text.trim().replaceAll(',', '.'));
+      231
+      232      if (amount == null || amount <= 0) {
+      233        messenger.showSnackBar(
+      233 -        const SnackBar(content: Text('Geçerli bir tutar girin')),
+      234 +        SnackBar(content: Text(l10n.enterValidAmount)),
+      235        );
+      236        return;
+      237      }
+      238      if (amount > _remaining + 0.009) {
+      239        messenger.showSnackBar(
+      240          SnackBar(
+      240 -          content: Text(
+      241 -              'Tutar kalan borçtan fazla olamaz (${_remaining.toStringAsFixed(0)} ₺)
+          -'),
+      241 +          content: Text(l10n.amountExceedsDebt(_remaining.toStringAsFixed(0))),
+      242          ),
+      243        );
+      244        return;
+
+● Update(lib\screens\finance\debtors_screen.dart)
+  ⎿  Added 4 lines, removed 3 lines
+      262        SnackBar(
+      263          content: Text(ok
+      264              ? (left > 0.009
+      265 -                ? '${amount.toStringAsFixed(0)} ₺ tahsil edildi, kalan ${left.toStri
+          -ngAsFixed(0)} ₺'
+      266 -                : '${amount.toStringAsFixed(0)} ₺ tahsil edildi, borç kapandı')
+      267 -            : 'Tahsilat kaydedilemedi'),
+      265 +                ? l10n.collectedWithRemaining(
+      266 +                    amount.toStringAsFixed(0), left.toStringAsFixed(0))
+      267 +                : l10n.collectedDebtClosed(amount.toStringAsFixed(0)))
+      268 +            : l10n.collectionFailed),
+      269          backgroundColor: ok ? AppTheme.success : AppTheme.error,
+      270        ),
+      271      );
+
+● Update(lib\screens\finance\debtors_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      299            ),
+      300            const SizedBox(height: 4),
+      301            Text(
+      302 -            'Kalan borç: ${_remaining.toStringAsFixed(0)} ₺',
+      302 +            context.l10n.remainingDebtInfo(_remaining.toStringAsFixed(0)),
+      303              style: const TextStyle(color: AppTheme.error, fontSize: 14),
+      304            ),
+      305            const SizedBox(height: 20),
+
+● Update(lib\screens\finance\debtors_screen.dart)
+  ⎿  Added 10 lines, removed 10 lines
+      309              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      310              onChanged: (_) => setState(() {}),
+      311              decoration: InputDecoration(
+      312 -              labelText: 'Tahsil edilen tutar (₺)',
+      312 +              labelText: context.l10n.collectedAmountField,
+      313                prefixIcon: const Icon(Icons.payments),
+      314                helperText: left != null && left > 0.009
+      315 -                  ? 'Kalan ${left.toStringAsFixed(0)} ₺ borç olarak takip edilir'
+      315 +                  ? context.l10n.remainingTracked(left.toStringAsFixed(0))
+      316                    : null,
+      317              ),
+      318            ),
+      319            const SizedBox(height: 16),
+      320 -          const Text('Ödeme Yöntemi', style: TextStyle(fontSize: 13)),
+      320 +          Text(context.l10n.paymentMethodLabel, style: const TextStyle(fontSize: 13)
+          +),
+      321            const SizedBox(height: 8),
+      322            SegmentedButton<String>(
+      323 -            segments: const [
+      323 +            segments: [
+      324                ButtonSegment(
+      325                  value: 'cash',
+      326 -                label: Text('Nakit'),
+      327 -                icon: Icon(Icons.account_balance_wallet),
+      326 +                label: Text(context.l10n.paymentCash),
+      327 +                icon: const Icon(Icons.account_balance_wallet),
+      328                ),
+      329                ButtonSegment(
+      330                  value: 'card',
+      331 -                label: Text('Kart'),
+      332 -                icon: Icon(Icons.credit_card),
+      331 +                label: Text(context.l10n.paymentCard),
+      332 +                icon: const Icon(Icons.credit_card),
+      333                ),
+      334                ButtonSegment(
+      335                  value: 'transfer',
+      336 -                label: Text('Havale'),
+      337 -                icon: Icon(Icons.account_balance),
+      336 +                label: Text(context.l10n.paymentTransfer),
+      337 +                icon: const Icon(Icons.account_balance),
+      338                ),
+      339              ],
+      340              selected: {_method},
+
+● Update(lib\screens\finance\debtors_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      353                        child: CircularProgressIndicator(
+      354                            strokeWidth: 2.5, color: Colors.white),
+      355                      )
+      356 -                  : const Text('Tahsil Et'),
+      356 +                  : Text(context.l10n.collectPayment),
+      357              ),
+      358            ),
+      359            const SizedBox(height: 24),
+
+● İstatistik ekranı:
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 2 lines
+       1  import 'package:fl_chart/fl_chart.dart';
+       2  import 'package:flutter/material.dart';
+       3 +import 'package:intl/intl.dart';
+       4  import 'package:provider/provider.dart';
+       5  import '../../providers/business_provider.dart';
+       6  import '../../providers/finance_provider.dart';
+       7 +import '../../core/l10n/l10n_ext.dart';
+       8  import '../../core/theme/app_theme.dart';
+       9
+      10  /// Detaylı finans istatistikleri: haftalık/aylık/yıllık gelir trendi,
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 9 lines, removed 11 lines
+      30      Color(0xFF0277BD),
+      31    ];
+      32
+      33 -  static const List<String> _monthNames = [
+      34 -    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+      35 -    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
+      36 -  ];
+      37 -  static const List<String> _monthShort = [
+      38 -    'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz',
+      39 -    'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara',
+      40 -  ];
+      41 -  static const List<String> _dayShort = [
+      42 -    'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz',
+      43 -  ];
+      33 +  String get _locale => Localizations.localeOf(context).toString();
+      34
+      35 +  /// Kısa ay adları (yerelleştirilmiş).
+      36 +  List<String> get _monthShort => List.generate(
+      37 +      12, (i) => DateFormat('MMM', _locale).format(DateTime(2024, i + 1)));
+      38 +
+      39 +  /// Kısa gün adları, Pazartesi'den başlar (yerelleştirilmiş).
+      40 +  List<String> get _dayShort => List.generate(
+      41 +      7, (i) => DateFormat('E', _locale).format(DateTime(2024, 1, i + 1)));
+      42 +
+      43    _Period _period = _Period.month;
+      44    DateTime _anchor = DateTime.now();
+      45    int? _employeeFilter; // null = tüm çalışanlar
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      86          final e = _rangeEnd;
+      87          return '${s.day} ${_monthShort[s.month - 1]} - ${e.day} ${_monthShort[e.month
+           - 1]} ${e.year}';
+      88        case _Period.month:
+      89 -        return '${_monthNames[_anchor.month - 1]} ${_anchor.year}';
+      89 +        return DateFormat('MMMM yyyy', _locale).format(_anchor);
+      90        case _Period.year:
+      91          return '${_anchor.year}';
+      92      }
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      147    @override
+      148    Widget build(BuildContext context) {
+      149      return Scaffold(
+      150 -      appBar: AppBar(title: const Text('İstatistikler')),
+      150 +      appBar: AppBar(title: Text(context.l10n.statisticsTitle)),
+      151        body: Consumer<FinanceProvider>(
+      152          builder: (context, provider, _) {
+      153            final income = _incomeRows(provider);
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 4 lines, removed 4 lines
+      161              children: [
+      162                // Dönem seçici
+      163                SegmentedButton<_Period>(
+      164 -                segments: const [
+      165 -                  ButtonSegment(value: _Period.week, label: Text('Hafta')),
+      166 -                  ButtonSegment(value: _Period.month, label: Text('Ay')),
+      167 -                  ButtonSegment(value: _Period.year, label: Text('Yıl')),
+      164 +                segments: [
+      165 +                  ButtonSegment(value: _Period.week, label: Text(context.l10n.period
+          +Week)),
+      166 +                  ButtonSegment(value: _Period.month, label: Text(context.l10n.perio
+      266
+      267                  _sectionCard(
+      268 -                    'En Çok Kazandıran Hizmetler',
+      268 +                    context.l10n.topServices,
+      269                      _buildRankedBars(
+      270                          _groupBy(income, (t) => t['category'] as String),
+      271                          limit: 5)),
+      272                  const SizedBox(height: 16),
+      273
+      274                  _sectionCard(
+      275 -                    'En İyi Müşteriler',
+      275 +                    context.l10n.topCustomers,
+      276                      _buildRankedBars(
+      277                          _groupBy(
+      278                              income.where((t) => t['customerName'] != null),
+     ...
+      282
+      283                  if (_employeeFilter == null && expenses.isNotEmpty) ...[
+      284                    _sectionCard(
+      285 -                      'Gider Kalemleri',
+      285 +                      context.l10n.expenseItems,
+      286                        _buildRankedBars(
+      287                            _groupBy(expenses, (t) => t['category'] as String),
+      288                            limit: 5,
+     ...
+      291                  ],
+      292
+      293                  if (provider.statsDebtorsByEmployee.isNotEmpty) ...[
+      294 -                  _sectionCard('Çalışan Bazlı Borçlar',
+      294 +                  _sectionCard(context.l10n.employeeDebtsTitle,
+      295                        _buildEmployeeDebts(provider)),
+      296                    const SizedBox(height: 16),
+      297                  ],
+      298
+      299                  _sectionCard(
+      300 -                    'Genel', _buildGeneralStats(provider, income, totalIncome)),
+      300 +                    context.l10n.generalTitle,
+      301 +                    _buildGeneralStats(provider, income, totalIncome)),
+      302                  const SizedBox(height: 24),
+      303                ],
+      304              ],
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 4 lines, removed 4 lines
+      392
+      393      final maxY = buckets.fold(0.0, (m, v) => v > m ? v : m);
+      394      if (maxY == 0) {
+      395 -      return const Padding(
+      396 -        padding: EdgeInsets.all(16),
+      395 +      return Padding(
+      396 +        padding: const EdgeInsets.all(16),
+      397          child: Center(
+      398 -            child: Text('Gelir kaydı yok',
+      399 -                style: TextStyle(color: AppTheme.textSecondary))),
+      398 +            child: Text(context.l10n.noIncomeRecords,
+      399 +                style: const TextStyle(color: AppTheme.textSecondary))),
+      400        );
+      401      }
+      402
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 5 lines, removed 1 line
+      468    Widget _buildPaymentChart(List<Map<String, dynamic>> income) {
+      469      // Sabit sıra ve renk: nakit, kart, havale.
+      470      const methods = ['cash', 'card', 'transfer'];
+      471 -    const methodLabels = {'cash': 'Nakit', 'card': 'Kart', 'transfer': 'Havale'};
+      471 +    final methodLabels = {
+      472 +      'cash': context.l10n.paymentCash,
+      473 +      'card': context.l10n.paymentCard,
+      474 +      'transfer': context.l10n.paymentTransfer,
+      475 +    };
+      476
+      477      final sums = {for (final m in methods) m: 0.0};
+      478      for (final t in income) {
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 4 lines, removed 4 lines
+      482      final total = sums.values.fold(0.0, (s, v) => s + v);
+      483
+      484      if (total == 0) {
+      485 -      return const Padding(
+      486 -        padding: EdgeInsets.all(16),
+      485 +      return Padding(
+      486 +        padding: const EdgeInsets.all(16),
+      487          child: Center(
+      488 -            child: Text('Gelir kaydı yok',
+      489 -                style: TextStyle(color: AppTheme.textSecondary))),
+      488 +            child: Text(context.l10n.noIncomeRecords,
+      489 +                style: const TextStyle(color: AppTheme.textSecondary))),
+      490        );
+      491      }
+      492
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 5 lines, removed 5 lines
+      555      final byEmployee = <String, List<Map<String, dynamic>>>{};
+      556      final idByName = <String, int?>{};
+      557      for (final t in income) {
+      558 -      final name = t['employeeName'] as String? ?? 'Atanmamış';
+      558 +      final name = t['employeeName'] as String? ?? context.l10n.unassigned;
+      559        byEmployee.putIfAbsent(name, () => []).add(t);
+      560        idByName[name] = t['employeeId'] as int?;
+      561      }
+      562
+      563      if (byEmployee.isEmpty) {
+      564 -      return const Padding(
+      565 -        padding: EdgeInsets.all(8),
+      566 -        child: Text('Kayıt yok',
+      567 -            style: TextStyle(color: AppTheme.textSecondary)),
+      564 +      return Padding(
+      565 +        padding: const EdgeInsets.all(8),
+      566 +        child: Text(context.l10n.noRecords,
+      567 +            style: const TextStyle(color: AppTheme.textSecondary)),
+      568        );
+      569      }
+      570
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 6 lines, removed 6 lines
+      694              fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primary),
+      695        ),
+      696        children: [
+      697 -        statRow('İşlem sayısı', '${rows.length}'),
+      698 -        statRow('Ortalama işlem', '${avg.toStringAsFixed(0)} ₺'),
+      697 +        statRow(context.l10n.transactionCount, '${rows.length}'),
+      698 +        statRow(context.l10n.avgTransaction, '${avg.toStringAsFixed(0)} ₺'),
+      699          if (completedAppointments != null)
+      700 -          statRow('Tamamlanan randevu', '$completedAppointments'),
+      701 -        statRow('Nakit', '${cash.toStringAsFixed(0)} ₺'),
+      702 -        statRow('Kart', '${card.toStringAsFixed(0)} ₺'),
+      703 -        statRow('Havale', '${transfer.toStringAsFixed(0)} ₺'),
+      700 +          statRow(context.l10n.completedAppointmentsStat, '$completedAppointments'),
+      701 +        statRow(context.l10n.paymentCash, '${cash.toStringAsFixed(0)} ₺'),
+      702 +        statRow(context.l10n.paymentCard, '${card.toStringAsFixed(0)} ₺'),
+      703 +        statRow(context.l10n.paymentTransfer, '${transfer.toStringAsFixed(0)} ₺'),
+      704        ],
+      705      );
+      706    }
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 4 lines, removed 4 lines
+      852    Widget _buildRankedBars(Map<String, double> data,
+      853        {int? limit, Color? color}) {
+      854      if (data.isEmpty) {
+      855 -      return const Padding(
+      856 -        padding: EdgeInsets.all(8),
+      857 -        child: Text('Kayıt yok',
+      858 -            style: TextStyle(color: AppTheme.textSecondary)),
+      855 +      return Padding(
+      856 +        padding: const EdgeInsets.all(8),
+      857 +        child: Text(context.l10n.noRecords,
+      858 +            style: const TextStyle(color: AppTheme.textSecondary)),
+      859        );
+      860      }
+      861
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      711      // Çalışan adına göre grupla (randevusuz borçlar "Atanmamış")
+      712      final byEmployee = <String, List<Map<String, dynamic>>>{};
+      713      for (final d in provider.statsDebtorsByEmployee) {
+      714 -      final name = d['employeeName'] as String? ?? 'Atanmamış';
+      714 +      final name = d['employeeName'] as String? ?? context.l10n.unassigned;
+      715        byEmployee.putIfAbsent(name, () => []).add(d);
+      716      }
+      717
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 4 lines, removed 5 lines
+      721
+      722      return Column(
+      723        children: [
+      724 -        const Padding(
+      725 -          padding: EdgeInsets.only(bottom: 8),
+      724 +        Padding(
+      725 +          padding: const EdgeInsets.only(bottom: 8),
+      726            child: Align(
+      727              alignment: Alignment.centerLeft,
+      728              child: Text(
+      729 -              'Borç, işi yapan çalışana göre gruplanır. Satıra dokununca '
+      730 -              'borçlu müşteriler listelenir.',
+      731 -              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+      729 +              context.l10n.employeeDebtHint,
+      730 +              style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+      731              ),
+      732            ),
+      733          ),
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      745                      children: [
+      746                        Expanded(
+      747                          child: Text(
+      748 -                          '${entries[i].key} • ${entries[i].value.length} borçlu müş
+          -teri',
+      748 +                          '${entries[i].key} • ${context.l10n.debtorCountLabel(entri
+          +es[i].value.length)}',
+      749                            overflow: TextOverflow.ellipsis,
+      750                            style: const TextStyle(fontSize: 13),
+      751                          ),
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      797              Padding(
+      798                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      799                child: Text(
+      800 -                '$employeeName — borçlu müşteriler '
+      801 -                '(${_sum2(sorted).toStringAsFixed(0)} ₺)',
+      800 +                context.l10n.employeeDebtorsSheet(
+      801 +                    employeeName, _sum2(sorted).toStringAsFixed(0)),
+      802                  style: const TextStyle(
+      803                      fontSize: 16, fontWeight: FontWeight.bold),
+      804                ),
+
+● Update(lib\screens\finance\finance_stats_screen.dart)
+  ⎿  Added 7 lines, removed 7 lines
+      929
+      930      return Column(
+      931        children: [
+      932 -        row('Gelir işlemi sayısı', '${income.length}'),
+      933 -        row('Ortalama işlem tutarı', '${avgTicket.toStringAsFixed(0)} ₺'),
+      934 -        row('Randevu (toplam)', '$totalApts'),
+      935 -        row('Tamamlanan randevu', '$completed'),
+      936 -        row('İptal edilen randevu', '$cancelled'),
+      937 -        row('Nakit oranı', '%${cashShare.toStringAsFixed(0)}'),
+      938 -        row('Açık borç toplamı',
+      932 +        row(context.l10n.incomeTransactionCount, '${income.length}'),
+      933 +        row(context.l10n.avgTransactionAmount, '${avgTicket.toStringAsFixed(0)} ₺'),
+      934 +        row(context.l10n.appointmentsTotal, '$totalApts'),
+      935 +        row(context.l10n.completedAppointmentsStat, '$completed'),
+      936 +        row(context.l10n.cancelledAppointmentsStat, '$cancelled'),
+      937 +        row(context.l10n.cashRatio, '%${cashShare.toStringAsFixed(0)}'),
+      938 +        row(context.l10n.openDebtTotal,
+      939              '${provider.totalDebtRemaining.toStringAsFixed(0)} ₺'),
+      940        ],
+      941      );
+
+● Ara doğrulama:
+
+● PowerShell(cd D:\dosyalar\projeler\KolayRandevu\randevu360\mobile; flutter analyze 2>&1 |
+            Select-Object -Last 6)
+  ⎿    xml 6.6.1 (7.0.1 available)
+     Got dependencies!
+     91 packages have newer versions incompatible with dependency constraints.
+     … +3 lines (ctrl+o to expand)
+  ⎿  (timeout 3m)
+
+● Temiz. Kalan ekranlar — categories, employee, customers:
+
+● Update(lib\screens\settings\categories_screen.dart)
+  ⎿  Added 1 line
+      2  import 'package:provider/provider.dart';
+      3  import '../../providers/business_provider.dart';
+      4  import '../../providers/finance_provider.dart';
+      5 +import '../../core/l10n/l10n_ext.dart';
+      6  import '../../core/theme/app_theme.dart';
+      7
+      8  /// Gelir/gider kategorilerini yönetir. Kategoriler yerel veritabanında
+
+● Update(lib\screens\settings\categories_screen.dart)
+  ⎿  Added 5 lines, removed 5 lines
+      43        context: context,
+      44        builder: (ctx) => AlertDialog(
+      45          title: Text(type == 'income'
+      46 -            ? 'Gelir Kategorisi Ekle'
+      47 -            : 'Gider Kategorisi Ekle'),
+      46 +            ? context.l10n.addIncomeCategory
+      47 +            : context.l10n.addExpenseCategory),
+      48          content: TextField(
+      49            controller: ctrl,
+      50            autofocus: true,
+      51 -          decoration: const InputDecoration(labelText: 'Kategori adı'),
+      51 +          decoration: InputDecoration(labelText: context.l10n.categoryNameField),
+      52            onSubmitted: (v) => Navigator.pop(ctx, v),
+      53          ),
+      54          actions: [
+      55            TextButton(
+      56                onPressed: () => Navigator.pop(ctx),
+      57 -              child: const Text('İptal')),
+      57 +              child: Text(context.l10n.cancel)),
+      58            ElevatedButton(
+      59                onPressed: () => Navigator.pop(ctx, ctrl.text),
+      60 -              child: const Text('Ekle')),
+      60 +              child: Text(context.l10n.add)),
+      61          ],
+      62        ),
+      63      );
+
+● Update(lib\screens\settings\categories_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      71      if (!ok) {
+      72        ScaffoldMessenger.of(context).showSnackBar(
+      73          SnackBar(
+      74 -          content: Text(provider.error ?? 'Kategori eklenemedi'),
+      74 +          content: Text(provider.error ?? context.l10n.categoryAddFailed),
+      75            backgroundColor: AppTheme.error,
+      76          ),
+      77        );
+
+● Update(lib\screens\settings\categories_screen.dart)
+  ⎿  Added 4 lines, removed 4 lines
+       85      final confirmed = await showDialog<bool>(
+       86        context: context,
+       87        builder: (ctx) => AlertDialog(
+       88 -        title: const Text('Kategoriyi Sil'),
+       88 +        title: Text(context.l10n.deleteCategoryTitle),
+       89          content: Text(
+       90 -            '"${category['name']}" silinecek. Geçmiş işlemler etkilenmez.'),
+       90 +            context.l10n.deleteCategoryConfirm(category['name'] as String)),
+       91          actions: [
+       92            TextButton(
+       93                onPressed: () => Navigator.pop(ctx, false),
+       94 -              child: const Text('İptal')),
+       94 +              child: Text(context.l10n.cancel)),
+       95            ElevatedButton(
+       96              onPressed: () => Navigator.pop(ctx, true),
+       97              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+       98 -            child: const Text('Sil', style: TextStyle(color: Colors.white)),
+       98 +            child: Text(context.l10n.delete, style: const TextStyle(color: Colors.wh
+          +ite)),
+       99            ),
+      100          ],
+      101        ),
+
+● Update(lib\screens\settings\categories_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      127                  TextButton.icon(
+      128                    onPressed: () => _addCategory(type),
+      129                    icon: const Icon(Icons.add, size: 18),
+      130 -                  label: const Text('Ekle'),
+      130 +                  label: Text(context.l10n.add),
+      131                  ),
+      132                ],
+      133              ),
+
+● Update(lib\screens\settings\categories_screen.dart)
+  ⎿  Added 4 lines, removed 4 lines
+      132                ],
+      133              ),
+      134              if (list.isEmpty)
+      135 -              const Padding(
+      136 -                padding: EdgeInsets.symmetric(vertical: 8),
+      137 -                child: Text('Kategori yok',
+      138 -                    style: TextStyle(color: AppTheme.textSecondary)),
+      135 +              Padding(
+      136 +                padding: const EdgeInsets.symmetric(vertical: 8),
+      137 +                child: Text(context.l10n.noCategories,
+      138 +                    style: const TextStyle(color: AppTheme.textSecondary)),
+      139                )
+      140              else
+      141                Wrap(
+
+● Update(lib\screens\settings\categories_screen.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      160    @override
+      161    Widget build(BuildContext context) {
+      162      return Scaffold(
+      163 -      appBar: AppBar(title: const Text('Gelir/Gider Kategorileri')),
+      163 +      appBar: AppBar(title: Text(context.l10n.categoriesTitle)),
+      164        body: Consumer<FinanceProvider>(
+      165          builder: (context, provider, _) {
+      166            return ListView(
+      167              padding: const EdgeInsets.all(16),
+      168              children: [
+      169 -              _section('Gelir Kategorileri', 'income', provider.categories,
+      169 +              _section(context.l10n.incomeCategories, 'income', provider.categories,
+      170                    AppTheme.success),
+      171                const SizedBox(height: 16),
+      172 -              _section('Gider Kategorileri', 'expense', provider.categories,
+      172 +              _section(context.l10n.expenseCategories, 'expense', provider.categorie
+          +s,
+      173                    AppTheme.error),
+      174              ],
+      175            );
+
+● Çalışan ekranı:
+
+● Update(lib\screens\employee\employee_screen.dart)
+● Update(lib\screens\employee\employee_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      69
+      70      return Scaffold(
+      71        appBar: AppBar(
+      72 -        title: const Text('Çalışanlar'),
+      72 +        title: Text(context.l10n.employeesTitle),
+      73          actions: [
+      74            if (isAdmin)
+      75              IconButton(
+
+● Update(lib\screens\employee\employee_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      87                  children: [
+      88                    Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+      89                    const SizedBox(height: 16),
+      90 -                  const Text('Henüz çalışan eklenmemiş', style: TextStyle(fontSize: 1
+         -6)),
+      90 +                  Text(context.l10n.noEmployeesYet, style: const TextStyle(fontSize:
+         +16)),
+      91                    const SizedBox(height: 8),
+      92                    if (isAdmin)
+      93                      ElevatedButton.icon(
+      94                        onPressed: () => _showAddEmployeeDialog(context),
+      95                        icon: const Icon(Icons.person_add, size: 18),
+      96 -                      label: const Text('Çalışan Ekle'),
+      96 +                      label: Text(context.l10n.addEmployee),
+      97                      ),
+      98                  ],
+      99                ),
+
+● Update(lib\screens\employee\employee_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      110                    controller: _searchCtrl,
+      111                    onChanged: (_) => setState(() {}),
+      112                    decoration: InputDecoration(
+      113 -                    hintText: 'İsim, e-posta veya telefon ara',
+      113 +                    hintText: context.l10n.searchEmployeeHint,
+      114                      prefixIcon: const Icon(Icons.search),
+      115                      isDense: true,
+      116                      suffixIcon: _searchCtrl.text.isNotEmpty
+
+● Update(lib\screens\employee\employee_screen.dart)
+  ⎿  Added 4 lines, removed 4 lines
+      127                  padding: const EdgeInsets.symmetric(horizontal: 12),
+      128                  child: Row(
+      129                    children: [
+      130 -                    for (final f in const [
+      131 -                      ('all', 'Tümü'),
+      132 -                      ('admin', 'Yönetici'),
+      133 -                      ('employee', 'Çalışan'),
+      130 +                    for (final f in [
+      131 +                      ('all', context.l10n.all),
+      132 +                      ('admin', context.l10n.roleAdmin),
+      133 +                      ('employee', context.l10n.roleEmployee),
+      134                      ])
+      135                        Padding(
+      136                          padding: const EdgeInsets.only(right: 8),
+
+● Update(lib\screens\employee\employee_screen.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      145                  ),
+      146                ),
+      147                if (filtered.isEmpty)
+      148 -                const Expanded(
+      148 +                Expanded(
+      149                    child: Center(
+      150 -                    child: Text('Eşleşen çalışan yok',
+      151 -                        style: TextStyle(color: AppTheme.textSecondary)),
+      150 +                    child: Text(context.l10n.noMatchingEmployees,
+      151 +                        style: const TextStyle(color: AppTheme.textSecondary)),
+      152                    ),
+      153                  )
+      154                else
+
+● Update(lib\screens\employee\employee_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      177                            borderRadius: BorderRadius.circular(8),
+      178                          ),
+      179                          child: Text(
+      180 -                          isAdminEmp ? 'Yönetici' : 'Çalışan',
+      180 +                          isAdminEmp ? context.l10n.roleAdmin : context.l10n.roleEmp
+          +loyee,
+      181                            style: TextStyle(
+      182                              color: isAdminEmp ? AppTheme.primary : AppTheme.secondar
+           y,
+      183                              fontSize: 11,
+
+● Update(lib\screens\employee\employee_screen.dart)
+  ⎿  Added 5 lines, removed 2 lines
+      189                          PopupMenuButton(
+      190                            itemBuilder: (_) => [
+      191                              PopupMenuItem(
+      192 -                              child: Text(isAdminEmp ? 'Çalışan Yap' : 'Yönetici Yap
+          -'),
+      192 +                              child: Text(isAdminEmp
+      193 +                                  ? context.l10n.makeEmployee
+      194 +                                  : context.l10n.makeAdmin),
+      195                                onTap: () => _toggleRole(emp, provider),
+      196                              ),
+      197                              PopupMenuItem(
+      196 -                              child: const Text('Sil', style: TextStyle(color: AppTh
+          -eme.error)),
+      198 +                              child: Text(context.l10n.delete,
+      199 +                                  style: const TextStyle(color: AppTheme.error)),
+      200                                onTap: () => _deleteEmployee(emp, provider),
+      201                              ),
+      202                            ],
+
+● Update(lib\screens\employee\employee_screen.dart)
+  ⎿  Added 6 lines, removed 5 lines
+      233      showDialog(
+      234        context: context,
+      235        builder: (_) => AlertDialog(
+      236 -        title: const Text('Çalışanı Sil'),
+      237 -        content: Text('${emp['name']} silinecek. Bu işlem geri alınamaz.'),
+      236 +        title: Text(context.l10n.deleteEmployeeTitle),
+      237 +        content: Text(context.l10n.deleteEmployeeConfirm(emp['name']?.toString() ??
+          +'')),
+      238          actions: [
+      239 -          TextButton(onPressed: () => Navigator.pop(context), child: const Text('İpt
+          -al')),
+      239 +          TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l1
+          +0n.cancel)),
+      240            ElevatedButton(
+      241              onPressed: () async {
+      242                Navigator.pop(context);
+      243 +              final l10n = context.l10n;
+      244                final remoteId = context
+      245                    .read<BusinessProvider>()
+      246                    .business?['remoteId'] as String?;
+     ...
+      251                if (mounted) {
+      252                  ScaffoldMessenger.of(context).showSnackBar(
+      253                    SnackBar(
+      253 -                    content: Text(success ? 'Çalışan silindi' : provider.error ?? 'S
+          -ilme başarısız'),
+      254 +                    content: Text(success ? l10n.employeeDeleted : provider.error ??
+          + l10n.deleteFailed),
+      255                      backgroundColor: success ? AppTheme.success : AppTheme.error,
+      256                    ),
+      257                  );
+      258                }
+      259              },
+      260              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+      260 -            child: const Text('Sil', style: TextStyle(color: Colors.white)),
+      261 +            child: Text(context.l10n.delete, style: const TextStyle(color: Colors.wh
+          +ite)),
+      262            ),
+      263          ],
+      264        ),
+
+● Update(lib\screens\employee\employee_screen.dart)
+  ⎿  Added 4 lines, removed 7 lines
+      281    bool _saving = false;
+      282
+      283    Future<void> _save(BuildContext context) async {
+      284 +    final l10n = context.l10n;
+      285      final name = _nameCtrl.text.trim();
+      286      final email = _emailCtrl.text.trim().toLowerCase();
+      287
+      288      if (name.isEmpty) {
+      289        ScaffoldMessenger.of(context).showSnackBar(
+      289 -        const SnackBar(content: Text('Ad Soyad gerekli')),
+      290 +        SnackBar(content: Text(l10n.fullNameRequired)),
+      291        );
+      292        return;
+      293      }
+      294      final emailValid = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+      295      if (!emailValid) {
+      296        ScaffoldMessenger.of(context).showSnackBar(
+      296 -        const SnackBar(
+      297 -          content: Text(
+      298 -              'Geçerli bir e-posta girin — çalışan bu adresteki Google '
+      299 -              'hesabıyla giriş yapacak'),
+      300 -        ),
+      297 +        SnackBar(content: Text(l10n.enterValidEmailInvite)),
+      298        );
+      299        return;
+      300      }
+     ...
+      303      final business = bizProv.business;
+      304      if (business == null) {
+      305        ScaffoldMessenger.of(context).showSnackBar(
+      309 -        const SnackBar(content: Text('İşletme bilgisi bulunamadı')),
+      306 +        SnackBar(content: Text(l10n.businessInfoNotFound)),
+      307        );
+      308        Navigator.pop(context);
+      309        return;
+
+● Update(lib\screens\employee\employee_screen.dart)
+  ⎿  Added 2 lines, removed 3 lines
+      345      final messenger = ScaffoldMessenger.of(context);
+      346      if (ok && provider.error == null) {
+      347        messenger.showSnackBar(SnackBar(
+      348 -        content: Text('$name eklendi. $email adresindeki Google hesabıyla '
+      349 -            'giriş yapıp "Çalışanım" seçeneğini kullanabilir.'),
+      348 +        content: Text(l10n.employeeAddedInfo(name, email)),
+      349          backgroundColor: AppTheme.success,
+      350          duration: const Duration(seconds: 5),
+      351        ));
+      352      } else {
+      353        messenger.showSnackBar(SnackBar(
+      355 -        content: Text(provider.error ?? 'Çalışan eklenemedi'),
+      354 +        content: Text(provider.error ?? l10n.employeeAddFailed),
+      355          backgroundColor: ok ? Colors.orange : AppTheme.error,
+      356          duration: const Duration(seconds: 6),
+      357        ));
+
+● Update(lib\screens\employee\employee_screen.dart)
+  ⎿  Added 10 lines, removed 10 lines
+      370    @override
+      371    Widget build(BuildContext context) {
+      372      return AlertDialog(
+      373 -      title: const Text('Çalışan Ekle'),
+      373 +      title: Text(context.l10n.addEmployee),
+      374        content: Column(
+      375          mainAxisSize: MainAxisSize.min,
+      376          children: [
+      377 -          TextField(controller: _nameCtrl, decoration: const InputDecoration(labelTe
+          -xt: 'Ad Soyad')),
+      377 +          TextField(controller: _nameCtrl, decoration: InputDecoration(labelText: co
+          +ntext.l10n.fullNameField)),
+      378            const SizedBox(height: 12),
+      379 -          TextField(controller: _phoneCtrl, decoration: const InputDecoration(labelT
+          -ext: 'Telefon'), keyboardType: TextInputType.phone),
+      379 +          TextField(controller: _phoneCtrl, decoration: InputDecoration(labelText: c
+          +ontext.l10n.phoneOnlyField), keyboardType: TextInputType.phone),
+      380            const SizedBox(height: 12),
+      381 -          TextField(controller: _emailCtrl, decoration: const InputDecoration(labelT
+          -ext: 'Email')),
+      381 +          TextField(controller: _emailCtrl, decoration: InputDecoration(labelText: c
+          +ontext.l10n.emailField)),
+      382            const SizedBox(height: 12),
+      383            DropdownButtonFormField(
+      384              initialValue: _role,
+      385 -            items: const [
+      386 -              DropdownMenuItem(value: 'employee', child: Text('Çalışan')),
+      387 -              DropdownMenuItem(value: 'admin', child: Text('Yönetici')),
+      385 +            items: [
+      386 +              DropdownMenuItem(value: 'employee', child: Text(context.l10n.roleEmplo
+          +yee)),
+      387 +              DropdownMenuItem(value: 'admin', child: Text(context.l10n.roleAdmin)),
+      388              ],
+      389              onChanged: (v) => setState(() => _role = v ?? 'employee'),
+      390 -            decoration: const InputDecoration(labelText: 'Yetki'),
+      390 +            decoration: InputDecoration(labelText: context.l10n.roleField),
+      391            ),
+      392          ],
+      393        ),
+      394        actions: [
+      395 -        TextButton(onPressed: () => Navigator.pop(context), child: const Text('İptal
+          -')),
+      395 +        TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n
+          +.cancel)),
+      396          ElevatedButton(
+      397            onPressed: _saving ? null : () => _save(context),
+      398            child: _saving
+      399                ? const SizedBox(
+      400                    width: 18, height: 18,
+      401                    child: CircularProgressIndicator(strokeWidth: 2))
+      402 -              : const Text('Ekle'),
+      402 +              : Text(context.l10n.add),
+      403          ),
+      404        ],
+      405      );
+
+● Müşteriler ekranı:
+
+● Update(lib\screens\customer\customers_screen.dart)
+  ⎿  Added 1 line
+      3  import '../../providers/business_provider.dart';
+      4  import '../../providers/customer_provider.dart';
+      5  import '../../providers/finance_provider.dart';
+      6 +import '../../core/l10n/l10n_ext.dart';
+      7  import '../../core/theme/app_theme.dart';
+      8  import 'customer_detail_screen.dart';
+      9
+
+● Update(lib\screens\customer\customers_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      80    @override
+      81    Widget build(BuildContext context) {
+      82      return Scaffold(
+      83 -      appBar: AppBar(title: const Text('Müşteriler')),
+      83 +      appBar: AppBar(title: Text(context.l10n.customersTitle)),
+      84        floatingActionButton: FloatingActionButton(
+      85 -        tooltip: 'Müşteri ekle',
+      85 +        tooltip: context.l10n.addCustomerTooltip,
+      86          onPressed: () => Navigator.pushNamed(context, '/add-customer')
+      87              .then((_) => _loadData()),
+      88          child: const Icon(Icons.person_add),
+
+● Update(lib\screens\customer\customers_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      103                    controller: _searchCtrl,
+      104                    onChanged: (_) => setState(() {}),
+      105                    decoration: InputDecoration(
+      106 -                    hintText: 'İsim, telefon veya e-posta ara',
+      106 +                    hintText: context.l10n.searchCustomerHint,
+      107                      prefixIcon: const Icon(Icons.search),
+      108                      isDense: true,
+      109                      suffixIcon: _searchCtrl.text.isNotEmpty
+
+● Update(lib\screens\customer\customers_screen.dart)
+  ⎿  Added 5 lines, removed 5 lines
+      121                  padding: const EdgeInsets.symmetric(horizontal: 12),
+      122                  child: Row(
+      123                    children: [
+      124 -                    for (final f in const [
+      125 -                      ('all', 'Tümü'),
+      126 -                      ('debtor', 'Borçlu'),
+      127 -                      ('contacts', 'Rehberden'),
+      128 -                      ('manual', 'Manuel'),
+      124 +                    for (final f in [
+      125 +                      ('all', context.l10n.all),
+      126 +                      ('debtor', context.l10n.filterDebtor),
+      127 +                      ('contacts', context.l10n.filterContacts),
+      128 +                      ('manual', context.l10n.filterManual),
+      129                      ])
+      130                        Padding(
+      131                          padding: const EdgeInsets.only(right: 8),
+
+● Update(lib\screens\customer\customers_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      143                  child: Align(
+      144                    alignment: Alignment.centerLeft,
+      145                    child: Text(
+      146 -                    '${customers.length} müşteri',
+      146 +                    context.l10n.customersCountLabel(customers.length),
+      147                      style: const TextStyle(
+      148                          fontSize: 12, color: AppTheme.textSecondary),
+      149                    ),
+
+● Update(lib\screens\customer\customers_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      158                          Icon(Icons.people_outline,
+      159                              size: 64, color: Colors.grey[400]),
+      160                          const SizedBox(height: 12),
+      161 -                        const Text('Henüz müşteri eklenmemiş'),
+      161 +                        Text(context.l10n.noCustomersYet),
+      162                          const SizedBox(height: 12),
+      163                          ElevatedButton.icon(
+      164                            onPressed: () =>
+      165                                Navigator.pushNamed(context, '/add-customer')
+      166                                    .then((_) => _loadData()),
+      167                            icon: const Icon(Icons.person_add, size: 18),
+      168 -                          label: const Text('Müşteri Ekle'),
+      168 +                          label: Text(context.l10n.addCustomerTitle),
+      169                          ),
+      170                        ],
+      171                      ),
+
+● Update(lib\screens\customer\customers_screen.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      172                    ),
+      173                  )
+      174                else if (customers.isEmpty)
+      175 -                const Expanded(
+      175 +                Expanded(
+      176                    child: Center(
+      177 -                    child: Text('Eşleşen müşteri yok',
+      178 -                        style: TextStyle(color: AppTheme.textSecondary)),
+      177 +                    child: Text(context.l10n.noMatchingCustomers,
+      178 +                        style: const TextStyle(color: AppTheme.textSecondary)),
+      179                    ),
+      180                  )
+      181                else
+
+● Update(lib\screens\customer\customers_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      212                                      borderRadius: BorderRadius.circular(8),
+      213                                    ),
+      214                                    child: Text(
+      215 -                                    '${debt.toStringAsFixed(0)} ₺ borç',
+      215 +                                    context.l10n.debtBadge(debt.toStringAsFixed(0)),
+      216                                      style: const TextStyle(
+      217                                          color: AppTheme.error,
+      218                                          fontSize: 12,
+
+● Müşteri ekleme ekranı:
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 1 line
+      3  import 'package:flutter_contacts/flutter_contacts.dart';
+      4  import '../../providers/customer_provider.dart';
+      5  import '../../providers/business_provider.dart';
+      6 +import '../../core/l10n/l10n_ext.dart';
+      7
+      8  class AddCustomerScreen extends StatefulWidget {
+      9    const AddCustomerScreen({super.key});
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 3 lines, removed 2 lines
+      34
+      35    Future<void> _pickFromContacts() async {
+      36      setState(() => _isLoadingContacts = true);
+      37 +    final l10n = context.l10n;
+      38
+      39      try {
+      40        final permission = await FlutterContacts.requestPermission();
+      41        if (!permission) {
+      42          if (mounted) {
+      43            ScaffoldMessenger.of(context).showSnackBar(
+      43 -            const SnackBar(
+      44 -              content: Text('Rehber erisim izni gerekli'),
+      44 +            SnackBar(
+      45 +              content: Text(l10n.contactPermissionRequired),
+      46                backgroundColor: Colors.orange,
+      47              ),
+      48            );
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      61
+      62        if (contacts.isEmpty) {
+      63          ScaffoldMessenger.of(context).showSnackBar(
+      64 -          const SnackBar(content: Text('Rehberde kisi bulunamadi')),
+      64 +          SnackBar(content: Text(l10n.noContactsFound)),
+      65          );
+      66          return;
+      67        }
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      74
+      75        if (withPhone.isEmpty) {
+      76          ScaffoldMessenger.of(context).showSnackBar(
+      77 -          const SnackBar(content: Text('Rehberde telefon numarasi olan kisi yok')),
+      77 +          SnackBar(content: Text(l10n.noContactsWithPhone)),
+      78          );
+      79          return;
+      80        }
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      93          final businessId = business?['id'];
+      94          if (businessId == null) {
+      95            ScaffoldMessenger.of(context).showSnackBar(
+      96 -            const SnackBar(content: Text('Isletme bilgisi bulunamadi'), backgroundCol
+         -or: Colors.red),
+      96 +            SnackBar(content: Text(l10n.businessInfoNotFound), backgroundColor: Color
+         +s.red),
+      97            );
+      98            return;
+      99          }
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      124          if (mounted) {
+      125            ScaffoldMessenger.of(context).showSnackBar(
+      126              SnackBar(
+      127 -              content: Text('$added kisi rehberden eklendi'),
+      127 +              content: Text(l10n.addedFromContacts(added)),
+      128                backgroundColor: Colors.green,
+      129              ),
+      130            );
+     ...
+      134      } catch (e) {
+      135        if (mounted) {
+      136          ScaffoldMessenger.of(context).showSnackBar(
+      137 -          SnackBar(content: Text('Rehber okunurken hata: $e'), backgroundColor: Colo
+          -rs.red),
+      137 +          SnackBar(content: Text(l10n.contactReadError(e.toString())), backgroundCol
+          +or: Colors.red),
+      138          );
+      139        }
+      140        setState(() => _isLoadingContacts = false);
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 3 lines, removed 2 lines
+      143
+      144    Future<void> _saveCustomer() async {
+      145      if (!_formKey.currentState!.validate()) return;
+      146 +    final l10n = context.l10n;
+      147
+      148      final businessProvider = context.read<BusinessProvider>();
+      149      final business = businessProvider.business;
+      150      if (business == null) {
+      151        ScaffoldMessenger.of(context).showSnackBar(
+      151 -        const SnackBar(content: Text('Isletme bilgisi bulunamadi'), backgroundColor:
+          - Colors.red),
+      152 +        SnackBar(content: Text(l10n.businessInfoNotFound), backgroundColor: Colors.r
+          +ed),
+      153        );
+      154        return;
+      155      }
+     ...
+      158      if (businessId == null) {
+      159        if (mounted) {
+      160          ScaffoldMessenger.of(context).showSnackBar(
+      160 -          const SnackBar(content: Text('Isletme bilgisi eksik. Lutfen tekrar deneyin
+          -.'), backgroundColor: Colors.red),
+      161 +          SnackBar(content: Text(l10n.businessInfoMissing), backgroundColor: Colors.
+          +red),
+      162          );
+      163        }
+      164        return;
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      181
+      182      if (success) {
+      183        ScaffoldMessenger.of(context).showSnackBar(
+      184 -        SnackBar(content: Text('${_nameController.text.trim()} basariyla eklendi'),
+          -backgroundColor: Colors.green),
+      184 +        SnackBar(content: Text(l10n.customerAddedSuccess(_nameController.text.trim()
+          +)), backgroundColor: Colors.green),
+      185        );
+      186        Navigator.pop(context, true);
+      187      } else {
+      188        final error = customerProvider.error;
+      189        ScaffoldMessenger.of(context).showSnackBar(
+      190 -        SnackBar(content: Text(error ?? 'Musteri eklenirken hata olustu'), backgroun
+          -dColor: Colors.red),
+      190 +        SnackBar(content: Text(error ?? l10n.customerAddError), backgroundColor: Col
+          +ors.red),
+      191        );
+      192      }
+      193    }
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      195    @override
+      196    Widget build(BuildContext context) {
+      197      return Scaffold(
+      198 -      appBar: AppBar(title: const Text('Musteri Ekle')),
+      198 +      appBar: AppBar(title: Text(context.l10n.addCustomerTitle)),
+      199        body: SingleChildScrollView(
+      200          padding: const EdgeInsets.all(16),
+      201          child: Column(
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      207                icon: _isLoadingContacts
+      208                    ? const SizedBox(width: 18, height: 18, child: CircularProgressInd
+           icator(strokeWidth: 2))
+      209                    : const Icon(Icons.contacts),
+      210 -              label: Text(_isLoadingContacts ? 'Rehber Yukleniyor...' : 'Rehberden K
+          -isi Ekle (Coklu Secim)'),
+      210 +              label: Text(_isLoadingContacts ? context.l10n.loadingContacts : contex
+          +t.l10n.pickFromContacts),
+      211                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(ve
+           rtical: 14)),
+      212              ),
+      213              const SizedBox(height: 24),
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 5 lines, removed 5 lines
+      213              const SizedBox(height: 24),
+      214
+      215              // Or divider
+      216 -            const Row(
+      216 +            Row(
+      217                children: [
+      218 -                Expanded(child: Divider()),
+      218 +                const Expanded(child: Divider()),
+      219                  Padding(
+      220 -                  padding: EdgeInsets.symmetric(horizontal: 16),
+      221 -                  child: Text('veya manuel girin'),
+      220 +                  padding: const EdgeInsets.symmetric(horizontal: 16),
+      221 +                  child: Text(context.l10n.orEnterManually),
+      222                  ),
+      223 -                Expanded(child: Divider()),
+      223 +                const Expanded(child: Divider()),
+      224                ],
+      225              ),
+      226              const SizedBox(height: 24),
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 17 lines, removed 17 lines
+      233                  children: [
+      234                    TextFormField(
+      235                      controller: _nameController,
+      236 -                    decoration: const InputDecoration(
+      237 -                      labelText: 'Ad Soyad *',
+      238 -                      prefixIcon: Icon(Icons.person),
+      239 -                      border: OutlineInputBorder(),
+      236 +                    decoration: InputDecoration(
+      237 +                      labelText: context.l10n.fullNameStarField,
+      238 +                      prefixIcon: const Icon(Icons.person),
+      239 +                      border: const OutlineInputBorder(),
+      240                      ),
+      241                      textCapitalization: TextCapitalization.words,
+      242                      validator: (value) {
+      243                        if (value == null || value.trim().isEmpty) {
+      244 -                        return 'Ad soyad zorunludur';
+      244 +                        return context.l10n.fullNameRequired;
+      245                        }
+      246                        return null;
+      247                      },
+     ...
+      249                    const SizedBox(height: 16),
+      250                    TextFormField(
+      251                      controller: _phoneController,
+      252 -                    decoration: const InputDecoration(
+      253 -                      labelText: 'Telefon',
+      254 -                      prefixIcon: Icon(Icons.phone),
+      255 -                      border: OutlineInputBorder(),
+      252 +                    decoration: InputDecoration(
+      253 +                      labelText: context.l10n.phoneOnlyField,
+      254 +                      prefixIcon: const Icon(Icons.phone),
+      255 +                      border: const OutlineInputBorder(),
+      256                        hintText: '05XX XXX XX XX',
+      257                      ),
+      258                      keyboardType: TextInputType.phone,
+     ...
+      260                    const SizedBox(height: 16),
+      261                    TextFormField(
+      262                      controller: _emailController,
+      263 -                    decoration: const InputDecoration(
+      264 -                      labelText: 'E-posta',
+      265 -                      prefixIcon: Icon(Icons.email),
+      266 -                      border: OutlineInputBorder(),
+      263 +                    decoration: InputDecoration(
+      264 +                      labelText: context.l10n.emailField,
+      265 +                      prefixIcon: const Icon(Icons.email),
+      266 +                      border: const OutlineInputBorder(),
+      267                      ),
+      268                      keyboardType: TextInputType.emailAddress,
+      269                    ),
+      270                    const SizedBox(height: 16),
+      271                    TextFormField(
+      272                      controller: _noteController,
+      273 -                    decoration: const InputDecoration(
+      274 -                      labelText: 'Not',
+      275 -                      prefixIcon: Icon(Icons.note),
+      276 -                      border: OutlineInputBorder(),
+      273 +                    decoration: InputDecoration(
+      274 +                      labelText: context.l10n.noteField,
+      275 +                      prefixIcon: const Icon(Icons.note),
+      276 +                      border: const OutlineInputBorder(),
+      277                        alignLabelWithHint: true,
+      278                      ),
+      279                      maxLines: 3,
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      287                        onPressed: _isSaving ? null : _saveCustomer,
+      288                        child: _isSaving
+      289                            ? const SizedBox(width: 22, height: 22, child: CircularPro
+           gressIndicator(strokeWidth: 2, color: Colors.white))
+      290 -                          : const Text('Kaydet', style: TextStyle(fontSize: 16)),
+      290 +                          : Text(context.l10n.save, style: const TextStyle(fontSize:
+          + 16)),
+      291                      ),
+      292                    ),
+      293                  ],
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      361            padding: const EdgeInsets.symmetric(horizontal: 16),
+      362            child: Row(
+      363              children: [
+      364 -              const Text('Rehberden Kisi Sec', style: TextStyle(fontSize: 18, fontWe
+          -ight: FontWeight.bold)),
+      364 +              Text(context.l10n.pickContactTitle, style: const TextStyle(fontSize: 1
+          +8, fontWeight: FontWeight.bold)),
+      365                const Spacer(),
+      366 -              Text('${_selectedIds.length} secildi', style: const TextStyle(color: C
+          -olors.grey)),
+      366 +              Text(context.l10n.selectedCount(_selectedIds.length), style: const Tex
+          +tStyle(color: Colors.grey)),
+      367              ],
+      368            ),
+      369          ),
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      374            child: TextField(
+      375              controller: _searchController,
+      376              decoration: InputDecoration(
+      377 -              hintText: 'Isim veya telefon ara...',
+      377 +              hintText: context.l10n.searchNameOrPhone,
+      378                prefixIcon: const Icon(Icons.search),
+      379                suffixIcon: _query.isNotEmpty
+      380                    ? IconButton(icon: const Icon(Icons.clear), onPressed: () { _searc
+           hController.clear(); setState(() => _query = ''); })
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      395                  onPressed: _toggleAll,
+      396                  icon: Icon(_selectedIds.length == filtered.length && filtered.isNotE
+           mpty ? Icons.deselect : Icons.select_all),
+      397                  label: Text(_selectedIds.length == filtered.length && filtered.isNot
+           Empty
+      398 -                    ? 'Hicbirini Secme'
+      399 -                    : 'Tumunu Sec (${filtered.length})'),
+      398 +                    ? context.l10n.selectNone
+      399 +                    : context.l10n.selectAllCount(filtered.length)),
+      400                ),
+      401              ],
+      402            ),
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      406            child: filtered.isEmpty
+      407                ? Center(
+      408                    child: Text(
+      409 -                    _query.isNotEmpty ? 'Aramanizla eslesen kisi yok' : 'Liste bos',
+      409 +                    _query.isNotEmpty ? context.l10n.noMatchingContacts : context.l1
+          +0n.emptyList,
+      410                      style: const TextStyle(color: Colors.grey),
+      411                    ),
+      412                  )
+
+● Update(lib\screens\customer\add_customer_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      493                      Navigator.pop(context, selected);
+      494                    },
+      495                    icon: const Icon(Icons.person_add),
+      496 -                  label: Text('${_selectedIds.length} Kisiyi Ekle'),
+      496 +                  label: Text(context.l10n.addNPeople(_selectedIds.length)),
+      497                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+      498                  ),
+      499                ),
+
+● Profil ekranı — önce görülmeyen kısmını okuyorum:
+
+● Reading 1 file… (ctrl+o to expand)
+  ⎿  lib\screens\profile\profile_screen.dart
+
+● Update(lib\screens\profile\profile_screen.dart)
+  ⎿  Added 1 line
+       5  import '../../providers/auth_provider.dart';
+       6  import '../../core/backup/backup_service.dart';
+       7  import '../../core/database/database_service.dart';
+       8 +import '../../core/l10n/l10n_ext.dart';
+       9  import '../../core/theme/app_theme.dart';
+      10  import '../../core/backup/backup_scheduler.dart';
+      11  import '../business/business_info_screen.dart';
+
+● Update(lib\screens\profile\profile_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      23    @override
+      24    Widget build(BuildContext context) {
+      25      return Scaffold(
+      26 -      appBar: AppBar(title: const Text('Profil')),
+      26 +      appBar: AppBar(title: Text(context.l10n.profileTitle)),
+      27        body: Consumer<AuthProvider>(
+      28          builder: (context, auth, _) {
+      29            return ListView(
+
+● Update(lib\screens\profile\profile_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      50                            crossAxisAlignment: CrossAxisAlignment.start,
+      51                            children: [
+      52                              Text(
+      53 -                              auth.user?.displayName ?? 'Kullanıcı',
+      53 +                              auth.user?.displayName ?? context.l10n.userFallback,
+      54                                style: const TextStyle(fontSize: 18, fontWeight: FontWe
+          ight.bold),
+      55                              ),
+      56                              Text(
+
+● Update(lib\screens\profile\profile_screen.dart)
+  ⎿  Added 2 lines, removed 2 lines
+      71                Card(
+      72                  child: Column(
+      73                    children: [
+      74 -                    _MenuItem(Icons.business, 'İşletme Bilgileri', () {
+      74 +                    _MenuItem(Icons.business, context.l10n.businessInfoTitle, () {
+      75                        Navigator.push(context, MaterialPageRoute(builder: (_) => const
+           BusinessInfoScreen()));
+      76                      }),
+      77                      const Divider(height: 1),
+      78 -                    _MenuItem(Icons.chat, 'WhatsApp Ayarları', () {
+      78 +                    _MenuItem(Icons.chat, context.l10n.whatsappSettings, () {
+      79                        Navigator.pushNamed(context, '/whatsapp-connect');
+      80                      }),
+      81                      if (auth.isAdmin) ...[
+
+● Update(lib\screens\profile\profile_screen.dart)
+  ⎿  Added 5 lines, removed 5 lines
+       80                      }),
+       81                      if (auth.isAdmin) ...[
+       82                        const Divider(height: 1),
+       83 -                      _MenuItem(Icons.design_services, 'Hizmetler ve Fiyatlar', () {
+       83 +                      _MenuItem(Icons.design_services, context.l10n.servicesAndPrice
+          +s, () {
+       84                          Navigator.push(context, MaterialPageRoute(builder: (_) => co
+           nst ServicesScreen()));
+       85                        }),
+       86                        const Divider(height: 1),
+       87 -                      _MenuItem(Icons.category, 'Gelir/Gider Kategorileri', () {
+       87 +                      _MenuItem(Icons.category, context.l10n.incomeExpenseCategories
+          +, () {
+       88                          Navigator.push(context, MaterialPageRoute(builder: (_) => co
+           nst CategoriesScreen()));
+       89                        }),
+       90                        const Divider(height: 1),
+       91 -                      _MenuItem(Icons.message, 'Mesaj Şablonları', () {
+       91 +                      _MenuItem(Icons.message, context.l10n.messageTemplatesTitle, (
+          +) {
+       92                          Navigator.push(context, MaterialPageRoute(builder: (_) => co
+           nst MessageTemplatesScreen()));
+       93                        }),
+       94                        const Divider(height: 1),
+       95 -                      _MenuItem(Icons.calendar_month, 'Çalışma Saatleri', () {
+       95 +                      _MenuItem(Icons.calendar_month, context.l10n.workingHoursMenu,
+          + () {
+       96                          Navigator.push(context, MaterialPageRoute(builder: (_) => co
+           nst WorkingHoursScreen()));
+       97                        }),
+       98                        const Divider(height: 1),
+       99 -                      _MenuItem(Icons.backup, 'Yedekleme', () async {
+       99 +                      _MenuItem(Icons.backup, context.l10n.backupMenu, () async {
+      100                          final messenger = ScaffoldMessenger.of(context);
+      101                          final db = context.read<DatabaseService>();
+      102                          final backup = BackupService();
+
+● Update(lib\screens\profile\profile_screen.dart)
+  ⎿  Added 11 lines, removed 13 lines
+       98                        const Divider(height: 1),
+       99                        _MenuItem(Icons.backup, context.l10n.backupMenu, () async {
+      100                          final messenger = ScaffoldMessenger.of(context);
+      101 +                        final l10n = context.l10n;
+      102                          final db = context.read<DatabaseService>();
+      103                          final backup = BackupService();
+      104                          if (!await backup.authenticate()) {
+      105                            messenger.showSnackBar(
+      105 -                            SnackBar(content: Text('Google girişi başarısız: ${backu
+          -p.lastError ?? ''}')),
+      106 +                            SnackBar(content: Text(l10n.googleSignInFailed(backup.la
+          +stError ?? ''))),
+      107                            );
+      108                            return;
+      109                          }
+      110                          final success = await backup.backup(db);
+      111                          messenger.showSnackBar(
+      112                            SnackBar(content: Text(success
+      112 -                              ? 'Yedeklendi ✅'
+      113 -                              : 'Yedekleme hatası: ${backup.lastError ?? ''}')),
+      113 +                              ? l10n.backedUp
+      114 +                              : l10n.backupFailedMsg(backup.lastError ?? ''))),
+      115                          );
+      116                        }),
+      117                        const Divider(height: 1),
+      117 -                      _MenuItem(Icons.restore, 'Yedekten Geri Yükle', () async {
+      118 +                      _MenuItem(Icons.restore, context.l10n.restoreMenu, () async {
+      119                          final messenger = ScaffoldMessenger.of(context);
+      120 +                        final l10n = context.l10n;
+      121                          final backup = BackupService();
+      122                          if (!await backup.authenticate()) {
+      123                            messenger.showSnackBar(
+      122 -                            SnackBar(content: Text('Google girişi başarısız: ${backu
+          -p.lastError ?? ''}')),
+      124 +                            SnackBar(content: Text(l10n.googleSignInFailed(backup.la
+          +stError ?? ''))),
+      125                            );
+      126                            return;
+      127                          }
+      128                          final success = await backup.restore();
+      129                          if (!success) {
+      130                            messenger.showSnackBar(
+      129 -                            SnackBar(content: Text('Geri yükleme hatası: ${backup.la
+          -stError ?? ''}')),
+      131 +                            SnackBar(content: Text(l10n.restoreFailedMsg(backup.last
+          +Error ?? ''))),
+      132                            );
+      133                            return;
+      134                          }
+     ...
+      139                            context: context,
+      140                            barrierDismissible: false,
+      141                            builder: (_) => AlertDialog(
+      140 -                            title: const Text('Yedek indirildi'),
+      141 -                            content: const Text(
+      142 -                              'Geri yüklemenin tamamlanması için uygulama şimdi '
+      143 -                              'kapanacak. Tekrar açtığınızda verileriniz '
+      144 -                              'yedekten geri yüklenmiş olacak.',
+      145 -                            ),
+      142 +                            title: Text(l10n.backupDownloadedTitle),
+      143 +                            content: Text(l10n.backupDownloadedMessage),
+      144                              actions: [
+      145                                TextButton(
+      146                                  onPressed: () => exit(0),
+      149 -                                child: const Text('Tamam'),
+      147 +                                child: Text(l10n.ok),
+      148                                ),
+      149                              ],
+      150                            ),
+
+● Update(lib\screens\profile\profile_screen.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      162                Card(
+      163                  child: Column(
+      164                    children: [
+      165 -                    _MenuItem(Icons.info_outline, 'Uygulama Hakkında', () {
+      165 +                    _MenuItem(Icons.info_outline, context.l10n.aboutApp, () {
+      166                        Navigator.push(context, MaterialPageRoute(builder: (_) => cons
+           t AboutScreen()));
+      167                      }),
+      168                      const Divider(height: 1),
+      169 -                    _MenuItem(Icons.description, 'Kullanım Koşulları', () {
+      169 +                    _MenuItem(Icons.description, context.l10n.termsOfUse, () {
+      170                        Navigator.push(context, MaterialPageRoute(builder: (_) => cons
+           t TermsScreen()));
+      171                      }),
+      172                      const Divider(height: 1),
+      173 -                    _MenuItem(Icons.shield, 'Gizlilik Politikası', () {
+      173 +                    _MenuItem(Icons.shield, context.l10n.privacyPolicy, () {
+      174                        Navigator.push(context, MaterialPageRoute(builder: (_) => cons
+           t PrivacyScreen()));
+      175                      }),
+      176                    ],
+
+● Update(lib\screens\profile\profile_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      185                  child: OutlinedButton.icon(
+      186                    onPressed: () => auth.signOut(),
+      187                    icon: const Icon(Icons.logout, color: AppTheme.error),
+      188 -                  label: const Text('Çıkış Yap', style: TextStyle(color: AppTheme.er
+          -ror)),
+      188 +                  label: Text(context.l10n.signOut, style: const TextStyle(color: Ap
+          +pTheme.error)),
+      189                    style: OutlinedButton.styleFrom(
+      190                      side: const BorderSide(color: AppTheme.error),
+      191                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circula
+           r(12)),
+
+● Update(lib\screens\profile\profile_screen.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      233    Widget build(BuildContext context) {
+      234      return SwitchListTile(
+      235        secondary: const Icon(Icons.nightlight_round, color: AppTheme.primary),
+      236 -      title: const Text('Gece Otomatik Yedekleme'),
+      237 -      subtitle: const Text('Her gece 02:00-03:00 arasında Drive\'a yedekler',
+      238 -          style: TextStyle(fontSize: 12)),
+      236 +      title: Text(context.l10n.autoBackupTitle),
+      237 +      subtitle: Text(context.l10n.autoBackupSubtitle,
+      238 +          style: const TextStyle(fontSize: 12)),
+      239        value: _enabled,
+      240        onChanged: !_loaded
+      241            ? null
+
+● Şablon ekranı:
+
+● Update(lib\screens\settings\message_templates_screen.dart)
+  ⎿  Added 1 line
+      2  import 'package:provider/provider.dart';
+      3  import '../../providers/business_provider.dart';
+      4  import '../../providers/whatsapp_provider.dart';
+      5 +import '../../core/l10n/l10n_ext.dart';
+      6  import '../../core/theme/app_theme.dart';
+      7
+      8  class MessageTemplatesScreen extends StatefulWidget {
+
+● Update(lib\screens\settings\message_templates_screen.dart)
+  ⎿  Added 5 lines, removed 5 lines
+      21 +    'off': context.l10n.freqOff,
+      22 +    'daily': context.l10n.freqDaily,
+      23 +    'weekly': context.l10n.freqWeekly,
+      24 +    'monthly': context.l10n.freqMonthly,
+      25    };
+      26
+      27    @override
+
+● Update(lib\screens\settings\message_templates_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      82
+      83      ScaffoldMessenger.of(context).showSnackBar(
+      84        SnackBar(
+      85 -        content: Text(ok ? 'Şablonlar kaydedildi' : 'Şablonlar kaydedilemedi'),
+      85 +        content: Text(ok ? context.l10n.templatesSaved : context.l10n.templatesSaveFa
+         +iled),
+      86          backgroundColor: ok ? AppTheme.success : AppTheme.error,
+      87        ),
+      88      );
+
+● Update(lib\screens\settings\message_templates_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      91    @override
+      92    Widget build(BuildContext context) {
+      93      return Scaffold(
+      94 -      appBar: AppBar(title: const Text('Mesaj Şablonları')),
+      94 +      appBar: AppBar(title: Text(context.l10n.messageTemplatesTitle)),
+      95        body: Consumer<WhatsAppProvider>(
+      96          builder: (context, provider, _) {
+      97            if (provider.templatesLoading && _controllers.isEmpty) {
+
+● Update(lib\screens\settings\message_templates_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      100
+      101            if (provider.templates.isEmpty) {
+      102              return _ErrorState(
+      103 -              message: provider.error ?? 'Şablonlar yüklenemedi',
+      103 +              message: provider.error ?? context.l10n.templatesLoadFailed,
+      104                onRetry: _loadTemplates,
+      105              );
+      106            }
+
+● Update(lib\screens\settings\message_templates_screen.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      115                    child: Column(
+      116                      crossAxisAlignment: CrossAxisAlignment.start,
+      117                      children: [
+      118 -                      const Text(
+      119 -                        'Kullanılabilir değişkenler',
+      120 -                        style: TextStyle(fontWeight: FontWeight.w700),
+      118 +                      Text(
+      119 +                        context.l10n.availableVariables,
+      120 +                        style: const TextStyle(fontWeight: FontWeight.w700),
+      121                        ),
+      122                        const SizedBox(height: 8),
+      123                        Wrap(
+
+● Update(lib\screens\settings\message_templates_screen.dart)
+  ⎿  Added 3 lines, removed 4 lines
+      131                              .toList(),
+      132                        ),
+      133                        const SizedBox(height: 8),
+      134 -                      const Text(
+      135 -                        'Mesaj gönderilirken bu değişkenler randevu bilgileriyle değ
+          -iştirilir. '
+      136 -                        'Bir şablonu tamamen boşaltırsanız o mesaj hiç gönderilmez.'
+          -,
+      137 -                        style: TextStyle(fontSize: 13, color: AppTheme.textSecondary
+          -),
+      134 +                      Text(
+      135 +                        context.l10n.templateHelp,
+      136 +                        style: const TextStyle(fontSize: 13, color: AppTheme.textSec
+          +ondary),
+      137                        ),
+      138                      ],
+      139                    ),
+
+● Update(lib\screens\settings\message_templates_screen.dart)
+  ⎿  Added 7 lines, removed 8 lines
+      149                    child: Column(
+      150                      crossAxisAlignment: CrossAxisAlignment.start,
+      151                      children: [
+      152 -                      const Text(
+      153 -                        'Borç hatırlatma sıklığı',
+      154 -                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+      152 +                      Text(
+      153 +                        context.l10n.debtReminderFrequency,
+      154 +                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize
+          +: 15),
+      155                        ),
+      156                        const SizedBox(height: 8),
+      157 -                      const Text(
+      158 -                        'Borcu olan müşterilere "Borç hatırlatma" şablonu seçilen '
+      159 -                        'sıklıkta otomatik gönderilir (10:00-20:00 arasında).',
+      160 -                        style: TextStyle(fontSize: 13, color: AppTheme.textSecondary
+          -),
+      157 +                      Text(
+      158 +                        context.l10n.debtReminderFrequencyHelp,
+      159 +                        style: const TextStyle(fontSize: 13, color: AppTheme.textSec
+          +ondary),
+      160                        ),
+      161                        const SizedBox(height: 12),
+      162                        DropdownButtonFormField<String>(
+     ...
+      165                            border: OutlineInputBorder(),
+      166                            prefixIcon: Icon(Icons.schedule),
+      167                          ),
+      169 -                        items: _frequencyLabels.entries
+      168 +                        items: _frequencyLabels(context).entries
+      169                              .map((e) => DropdownMenuItem(
+      170                                    value: e.key,
+      171                                    child: Text(e.value),
+
+● Update(lib\screens\settings\message_templates_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      202                                onPressed: () => setState(() {
+      203                                  controller.text = template['defaultText']?.toString(
+           ) ?? '';
+      204                                }),
+      205 -                              child: const Text('Varsayılana dön'),
+      205 +                              child: Text(context.l10n.resetToDefault),
+      206                              ),
+      207                            ],
+      208                          ),
+
+● Update(lib\screens\settings\message_templates_screen.dart)
+  ⎿  Added 3 lines, removed 3 lines
+      211                            controller: controller,
+      212                            maxLines: null,
+      213                            minLines: 4,
+      214 -                          decoration: const InputDecoration(
+      215 -                            border: OutlineInputBorder(),
+      216 -                            hintText: 'Mesaj göndermemek için boş bırakın',
+      214 +                          decoration: InputDecoration(
+      215 +                            border: const OutlineInputBorder(),
+      216 +                            hintText: context.l10n.emptyToDisable,
+      217                            ),
+      218                          ),
+      219                        ],
+
+● Update(lib\screens\settings\message_templates_screen.dart)
+  ⎿  Added 1 line, removed 1 line
+      231                            height: 22,
+      232                            child: CircularProgressIndicator(strokeWidth: 2.5, color:
+           Colors.white),
+      233                          )
+      234 -                      : const Text('Kaydet'),
+      234 +                      : Text(context.l10n.save),
+      235                  ),
+      236                ),
+      237                const SizedBox(height: 24),
+
+● Update(lib\screens\settings\message_templates_screen.dart)
+  ⎿  Added 4 lines, removed 4 lines
+      265                style: TextStyle(color: Colors.grey[600]),
+      266              ),
+      267              const SizedBox(height: 8),
+      268 -            const Text(
+      269 -              'Şablonlar WhatsApp sunucusunda tutulur; bağlantı gerekir.',
+      268 +            Text(
+      269 +              context.l10n.templatesServerNote,
+      270                textAlign: TextAlign.center,
+      271 -              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+      271 +              style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+      272              ),
+      273              const SizedBox(height: 16),
+      274              ElevatedButton.icon(
+      275                onPressed: onRetry,
+      276                icon: const Icon(Icons.refresh, size: 18),
+      277 -              label: const Text('Tekrar dene'),
+      277 +              label: Text(context.l10n.retry),
+      278              ),
+      279            ],
+      280          ),
+
+● PowerShell(cd D:\dosyalar\projeler\KolayRandevu\randevu360\mobile; flutter analyze 2>&1 |
+            Select-Object -Last 4)
+  ⎿  91 packages have newer versions incompatible with dependency constraints.
+     Try `flutter pub outdated` for more information.
+     Analyzing mobile...
+     No issues found! (ran in 4.7s)
+  ⎿  (timeout 3m)
+  ⎿  You've hit your session limit · resets 6pm (Europe/Istanbul)
+     /upgrade to increase your usage limit.

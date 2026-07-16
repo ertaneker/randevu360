@@ -1,0 +1,40 @@
+# Flutter
+mobile/.dart_tool/
+mobile/.packages
+mobile/build/
+mobile/.flutter-plugins*
+mobile/.metadata
+mobile/*.iml
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/key.properties
+
+# WhatsApp Service
+whatsapp-service/node_modules/
+whatsapp-service/auth/
+whatsapp-service/data/
+whatsapp-service/.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# MCP
+.mcp.json
+
+# SSH keys
+ssh-key-*.key
+ssh-key-*.key.pub
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Firebase
+firebase/firebase.json
+mobile/android/app/google-services.json
+mobile/ios/Runner/GoogleService-Info.plist

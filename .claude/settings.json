@@ -1,0 +1,7 @@
+{
+  "project": {
+    "name": "Randevu 360",
+    "description": "Küçük işletmeler için randevu yönetimi + WhatsApp entegrasyonu",
+    "type": "flutter+mobile+nodejs"
+  }
+}

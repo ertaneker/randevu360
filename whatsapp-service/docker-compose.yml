@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  whatsapp-service:
+    build: .
+    container_name: randevu360-whatsapp
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./auth:/app/auth
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - API_KEY=your-secret-api-key-change-this
+      - FLUTTER_API_URL=http://flutter-app:8080
+      - MESSAGE_CALLBACK_URL=http://flutter-app:8080
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    mem_limit: 256m
+    cpu_shares: 512
+    networks:
+      - randevu360-network
+
+  # Optional: Redis for queue management if scaling
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: randevu360-redis
+  #   volumes:
+  #     - redis-data:/data
+  #   restart: unless-stopped
+  #   networks:
+  #     - randevu360-network
+
+networks:
+  randevu360-network:
+    driver: bridge
+
+# volumes:
+#   redis-data:

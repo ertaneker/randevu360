@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ──── İŞLETMELER ────
+    match /businesses/{businessId} {
+
+      // İşletme dokümanı: sadece o işletmenin çalışanları/owner'ı okuyabilir.
+      // businessId == uid kontrolü, doküman henüz yokken de okumaya izin verir
+      // (resource null olur; aksi halde varlık kontrolü PERMISSION_DENIED döner).
+      allow read: if request.auth != null && (
+        businessId == request.auth.uid ||
+        (resource != null && (
+          resource.data.ownerUid == request.auth.uid ||
+          resource.data.get('employees', []).hasAny([request.auth.token.email])
+        ))
+      );
+
+      // Owner'ı yazabilir
+      allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if request.auth != null && (
+        resource.data.ownerUid == request.auth.uid ||
+        resource.data.admins.hasAny([request.auth.uid])
+      );
+      allow delete: if request.auth != null && resource.data.ownerUid == request.auth.uid;
+
+      // ──── ÇALIŞANLAR ────
+      match /employees/{employeeId} {
+
+        // Çalışanlar: admin/owner her şeyi yapabilir, çalışan kendi profilini okuyabilir
+        allow read: if request.auth != null && (
+          get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerUid == request.auth.uid ||
+          get(/databases/$(database)/documents/businesses/$(businessId)).data.admins.hasAny([request.auth.uid]) ||
+          employeeId == request.auth.token.email
+        );
+
+        allow write: if request.auth != null && (
+          get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerUid == request.auth.uid ||
+          get(/databases/$(database)/documents/businesses/$(businessId)).data.admins.hasAny([request.auth.uid])
+        );
+
+        // Çalışan kendi dokümanına sadece fbUid yazabilir (ilk girişte)
+        allow update: if request.auth != null &&
+          employeeId == request.auth.token.email &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fbUid']);
+      }
+
+      // ──── RANDEVU ÖZETİ (senkronizasyon) ────
+      match /appointments/{appointmentId} {
+        allow read: if request.auth != null && (
+          get(/databases/$(database)/documents/businesses/$(businessId)).data.employees.hasAny([request.auth.token.email])
+        );
+
+        allow write: if request.auth != null && (
+          get(/databases/$(database)/documents/businesses/$(businessId)).data.employees.hasAny([request.auth.token.email])
+        );
+      }
+
+      // ──── WHATSAPP SESSION ────
+      match /whatsapp/{sessionId} {
+        allow read, write: if request.auth != null && (
+          get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerUid == request.auth.uid
+        );
+      }
+    }
+
+    // ──── KULLANICI PROFİLLERİ ────
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Default: her şey kapalı
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
