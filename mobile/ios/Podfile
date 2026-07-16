@@ -41,7 +41,6 @@ target 'Runner' do
   pod 'FirebaseCore', :modular_headers => true
   pod 'FirebaseAuth', :modular_headers => true
   pod 'FirebaseMessaging', :modular_headers => true
-  pod 'FirebaseFirestore', :modular_headers => true
   pod 'GoogleSignIn', :modular_headers => true
 end
 
