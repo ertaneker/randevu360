@@ -56,13 +56,40 @@ jobs:
         working-directory: mobile/ios
         run: pod install
 
-      - name: Build iOS (no codesign)
-        working-directory: mobile
-        run: flutter build ios --no-codesign
+      - name: Write App Store Connect API key
+        run: |
+          mkdir -p ~/private_keys
+          echo "${{ secrets.APPLE_PRIVATE_KEY }}" > ~/private_keys/AuthKey.p8
 
-      - name: Upload iOS build artifact
+      - name: Archive iOS app
+        working-directory: mobile
+        run: |
+          xcodebuild archive \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath $RUNNER_TEMP/Runner.xcarchive \
+            -destination 'generic/platform=iOS' \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey.p8 \
+            -authenticationKeyIssuerID "${{ secrets.APPLE_ISSUER_ID }}" \
+            -authenticationKeyID "${{ secrets.APPLE_KEY_ID }}"
+
+      - name: Export IPA
+        working-directory: mobile
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath $RUNNER_TEMP/Runner.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey.p8 \
+            -authenticationKeyIssuerID "${{ secrets.APPLE_ISSUER_ID }}" \
+            -authenticationKeyID "${{ secrets.APPLE_KEY_ID }}"
+
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-runner-app
-          path: mobile/build/ios/iphoneos/Runner.app
-          retention-days: 7
+          name: esnaftakvim-ios
+          path: mobile/build/ios/ipa/Esnaf Takvim.ipa
+          retention-days: 30
