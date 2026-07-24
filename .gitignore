@@ -38,3 +38,4 @@ Thumbs.db
 firebase/firebase.json
 mobile/android/app/google-services.json
 mobile/ios/Runner/GoogleService-Info.plist
+mobile/pubspec.lock
