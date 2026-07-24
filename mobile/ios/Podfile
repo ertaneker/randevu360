@@ -4,6 +4,10 @@ platform :ios, '14.0'
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
+# Force newer Firebase SDK — GoogleSignIn 8.0 needs GoogleUtilities 8.0,
+# Firebase 10.x needs ~>7.x. Firebase 11.x is compatible with GoogleUtilities 8.0.
+$FirebaseSDKVersion = '11.0.0'
+
 project 'Runner', {
   'Debug' => :debug,
   'Profile' => :release,
