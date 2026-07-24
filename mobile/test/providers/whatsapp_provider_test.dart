@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:randevu360/providers/whatsapp_provider.dart';
+import 'package:esnaftakvim/providers/whatsapp_provider.dart';
 
 // ---------------------------------------------------------------------------
 // WhatsAppProvider — unit tests for state management and computed properties.

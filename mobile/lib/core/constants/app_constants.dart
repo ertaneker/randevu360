@@ -1,5 +1,22 @@
+/// Randevu için varsayılan periyot (dk) — Ayarlar > Grid Görüntüleme
+/// Saatleri'nde değiştirilebilir, cihaza özel (SharedPreferences).
+const kAppointmentSlotMinutesPrefKey = 'appointment_slot_minutes';
+const kDefaultAppointmentSlotMinutes = 60;
+
+/// Google Play Console > Monetization > Subscriptions'da oluşturulan
+/// abonelik ürün kimliği. Aylık 249 TL, otomatik yenilenir.
+const kSubscriptionProductId = 'esnaftakvim_aylik';
+const kSubscriptionMonthlyPriceLabel = '299 TL/ay';
+const kTrialDays = 3;
+
+/// Paywall geliştirme atlama butonunu açar/kapatır.
+/// Üretimde false yapılacak. TODO: Üretim öncesi kaldır.
+const kPaywallSkipEnabled = true;
+const kTrialStartDateKey = 'trial_start_date';
+const kPaywallSkippedKey = 'paywall_skipped_dev';
+
 class AppConstants {
-  static const String appName = 'Randevu 360';
+  static const String appName = 'Esnaf Takvim';
   static const String version = '1.0.0';
 
   // WhatsApp Service

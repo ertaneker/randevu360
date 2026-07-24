@@ -17,7 +17,7 @@ class PrivacyScreen extends StatelessWidget {
             SizedBox(height: 16),
             _Section(
               title: 'Toplanan Veriler',
-              content: 'Randevu 360 şu verileri toplar:\n'
+              content: 'Esnaf Takvim şu verileri toplar:\n'
                   '• Google hesap bilgileriniz (ad, e-posta, profil fotoğrafı)\n'
                   '• İşletme bilgileriniz\n'
                   '• Müşteri bilgileri (sizin girdiğiniz)\n'

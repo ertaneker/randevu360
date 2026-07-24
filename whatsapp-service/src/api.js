@@ -4,6 +4,8 @@ const { v4: uuidv4 } = require('uuid');
 const clientManager = require('./client');
 const logger = require('./logger');
 const db = require('./db');
+const pgdb = require('./pgdb');
+const billing = require('./billing');
 const { DEFAULT_TEMPLATES, TEMPLATE_LABELS, VARIABLES, render } = require('./templates');
 
 // scheduler instance will be injected from index.js
@@ -370,6 +372,264 @@ router.post('/incoming', apiAuth, async (req, res) => {
     });
 
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════
+// İŞLETME & ÇALIŞAN YÖNETİMİ (Firestore yerine PostgreSQL)
+// ════════════════════════════════════════════════════════════════
+
+// İşletme bilgisini getir
+router.get('/business/:id', apiAuth, async (req, res) => {
+  try {
+    const biz = await pgdb.getBusiness(req.params.id);
+    if (!biz) return res.status(404).json({ error: 'İşletme bulunamadı' });
+    res.json({
+      id: biz.id,
+      name: biz.name,
+      phone: biz.phone,
+      address: biz.address,
+      email: biz.email,
+      ownerUid: biz.owner_uid,
+      ownerEmail: biz.owner_email,
+      ownerName: biz.owner_name,
+      workingDays: biz.working_days,
+      workingHours: biz.working_hours,
+      sharedWhatsapp: biz.shared_whatsapp,
+      createdAt: biz.created_at,
+      updatedAt: biz.updated_at,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// İşletme oluştur/güncelle
+router.put('/business/:id', apiAuth, async (req, res) => {
+  try {
+    const { name, phone, address, email, ownerUid, ownerEmail, ownerName } = req.body;
+    if (!name || !ownerUid || !ownerEmail || !ownerName) {
+      return res.status(400).json({ error: 'name, ownerUid, ownerEmail, ownerName gerekli' });
+    }
+    await pgdb.upsertBusiness({
+      id: req.params.id,
+      name, phone, address, email,
+      ownerUid, ownerEmail, ownerName,
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// İşletme ayarlarını güncelle (çalışma saatleri, sharedWhatsapp)
+router.put('/business/:id/settings', apiAuth, async (req, res) => {
+  try {
+    await pgdb.updateBusinessSettings(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Abonelik durumu — sahip ve tüm çalışan cihazları açılışta bunu sorar.
+// Gerçek karar sunucuda tarihten hesaplanır, istemciye güvenilmez.
+router.get('/business/:id/subscription', apiAuth, async (req, res) => {
+  try {
+    const status = await pgdb.getSubscriptionStatus(req.params.id);
+    if (!status) return res.status(404).json({ error: 'Abonelik kaydı bulunamadı' });
+    res.json(status);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Satın alma / yenileme doğrulaması — sadece işletme sahibinin cihazından
+// çağrılır (satın alma sonrası ve her açılışta arka planda tazeleme için).
+router.post('/business/:id/subscription/verify', apiAuth, async (req, res) => {
+  try {
+    const { purchaseToken, productId } = req.body;
+    if (!purchaseToken || !productId) {
+      return res.status(400).json({ error: 'purchaseToken ve productId gerekli' });
+    }
+
+    const result = await billing.verifySubscriptionPurchase({ purchaseToken, productId });
+    if (!result.valid || !result.currentPeriodEnd) {
+      return res.status(402).json({ error: 'Satın alma doğrulanamadı' });
+    }
+
+    await pgdb.saveSubscriptionVerification(req.params.id, {
+      purchaseToken,
+      productId,
+      currentPeriodEnd: result.currentPeriodEnd,
+    });
+
+    const status = await pgdb.getSubscriptionStatus(req.params.id);
+    res.json(status);
+  } catch (err) {
+    logger.error(`Abonelik doğrulama hatası: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Çalışan ekle
+router.post('/business/:id/employees', apiAuth, async (req, res) => {
+  try {
+    const { email, name, role } = req.body;
+    if (!email || !name) {
+      return res.status(400).json({ error: 'email ve name gerekli' });
+    }
+    await pgdb.addEmployee(req.params.id, { email: email.trim().toLowerCase(), name, role });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Çalışan listesi
+router.get('/business/:id/employees', apiAuth, async (req, res) => {
+  try {
+    const employees = await pgdb.listEmployees(req.params.id);
+    res.json(employees.map(e => ({
+      email: e.email,
+      name: e.name,
+      role: e.role,
+      fbUid: e.fb_uid,
+      permissions: e.permissions,
+      status: e.status,
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Çalışan sil
+router.delete('/business/:id/employees/:email', apiAuth, async (req, res) => {
+  try {
+    await pgdb.removeEmployee(req.params.id, decodeURIComponent(req.params.email));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Çalışan güncelle (rol/izin/fbUid)
+router.put('/business/:id/employees/:email', apiAuth, async (req, res) => {
+  try {
+    const email = decodeURIComponent(req.params.email);
+    const { role, permissions, fbUid } = req.body;
+
+    if (role) await pgdb.updateEmployeeRole(req.params.id, email, role);
+    if (permissions) await pgdb.updateEmployeePermissions(req.params.id, email, permissions);
+    if (fbUid) await pgdb.setEmployeeFbUid(req.params.id, email, fbUid);
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Çalışan daveti bul (giriş ekranı için)
+router.get('/employees/lookup', apiAuth, async (req, res) => {
+  try {
+    const email = (req.query.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'email gerekli' });
+
+    const invite = await pgdb.findEmployeeInvite(email);
+    if (!invite) return res.json(null);
+
+    res.json({
+      businessId: invite.business_id,
+      businessName: invite.business_name,
+      employeeName: invite.name,
+      role: invite.role,
+      permissions: invite.permissions,
+      isOwner: false,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Çalışan izinlerini oku
+router.get('/business/:id/employees/:email/permissions', apiAuth, async (req, res) => {
+  try {
+    const emp = await pgdb.getEmployee(req.params.id, decodeURIComponent(req.params.email));
+    if (!emp) return res.status(404).json({ error: 'Çalışan bulunamadı' });
+    res.json(emp.permissions || {});
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// WhatsApp oturum anahtarını oku
+router.get('/business/:id/whatsapp-session', apiAuth, async (req, res) => {
+  try {
+    const key = await pgdb.getWhatsAppSession(req.params.id);
+    res.json({ sessionKey: key });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// WhatsApp oturum anahtarını yaz
+router.put('/business/:id/whatsapp-session', apiAuth, async (req, res) => {
+  try {
+    const { sessionKey } = req.body;
+    if (!sessionKey) return res.status(400).json({ error: 'sessionKey gerekli' });
+    await pgdb.setWhatsAppSession(req.params.id, sessionKey);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════
+// CİHAZLAR ARASI VERİ SENKRONU (Firestore rows yerine)
+// ════════════════════════════════════════════════════════════════
+
+// Pull: cursor'dan sonraki satırları çek
+router.post('/sync/:businessId/pull', apiAuth, async (req, res) => {
+  try {
+    const { cursor = 0, limit = 300, deviceId } = req.body;
+    const rows = await pgdb.pullRows(req.params.businessId, cursor, limit);
+
+    let newCursor = cursor;
+    for (const row of rows) {
+      if (row.deviceId === deviceId) {
+        row._skip = true; // kendi yazdığını çekme
+      }
+      // PostgreSQL BIGINT pg tarafından string dönebilir
+      const serverAt = typeof row.serverAt === 'string' ? parseInt(row.serverAt, 10) : row.serverAt;
+      if (serverAt > newCursor) newCursor = serverAt;
+    }
+
+    const filtered = rows.filter(r => !r._skip).map(r => ({
+      rowUid: r.rowUid,
+      table: r.table,
+      updatedAt: r.updatedAt,
+      deletedAt: r.deletedAt,
+      deviceId: r.deviceId,
+      data: r.data,
+    }));
+
+    res.json({ rows: filtered, newCursor: Number(newCursor) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Push: kirli satırları gönder
+router.post('/sync/:businessId/push', apiAuth, async (req, res) => {
+  try {
+    const { deviceId, rows } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.json({ success: true, pushed: 0 });
+    }
+    const pushed = await pgdb.pushRows(req.params.businessId, deviceId, rows);
+    res.json({ success: true, pushed });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

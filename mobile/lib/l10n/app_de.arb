@@ -1,6 +1,6 @@
 {
   "@@locale": "de",
-  "appTitle": "Randevu 360",
+  "appTitle": "Esnaf Takvim",
   "save": "Speichern",
   "cancel": "Abbrechen",
   "delete": "Löschen",
@@ -290,7 +290,7 @@
 
   "defineBusiness": "Unternehmen einrichten",
   "businessInfoTitle": "Unternehmensinformationen",
-  "businessSetupSubtitle": "Richten Sie Ihr Unternehmen ein, um Randevu 360 zu nutzen",
+  "businessSetupSubtitle": "Richten Sie Ihr Unternehmen ein, um Esnaf Takvim zu nutzen",
   "businessNameField": "Unternehmensname",
   "businessNameRequired": "Unternehmensname ist erforderlich",
   "addressField": "Adresse",

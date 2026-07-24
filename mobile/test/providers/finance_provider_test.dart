@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:randevu360/providers/finance_provider.dart';
+import 'package:esnaftakvim/providers/finance_provider.dart';
 
 // ---------------------------------------------------------------------------
 // FinanceProvider — unit tests for state management, computed properties,

@@ -1,6 +1,6 @@
 {
   "@@locale": "it",
-  "appTitle": "Randevu 360",
+  "appTitle": "Esnaf Takvim",
   "save": "Salva",
   "cancel": "Annulla",
   "delete": "Elimina",
@@ -290,7 +290,7 @@
 
   "defineBusiness": "Configura la tua attività",
   "businessInfoTitle": "Informazioni dell'attività",
-  "businessSetupSubtitle": "Configura la tua attività per usare Randevu 360",
+  "businessSetupSubtitle": "Configura la tua attività per usare Esnaf Takvim",
   "businessNameField": "Nome dell'attività",
   "businessNameRequired": "Il nome dell'attività è obbligatorio",
   "addressField": "Indirizzo",

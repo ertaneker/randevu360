@@ -5,6 +5,7 @@ import '../../providers/whatsapp_provider.dart';
 import '../../providers/business_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../services/whatsapp_session.dart';
 import 'message_history_screen.dart';
 
 class WhatsAppConnectScreen extends StatefulWidget {
@@ -22,23 +23,28 @@ class _WhatsAppConnectScreenState extends State<WhatsAppConnectScreen> {
   Timer? _statusPollTimer;
   bool _isRequesting = false;
 
+  /// Sunucudaki oturum anahtarı: yönetici/ortak hat → işletme,
+  /// ortak hat kapalıyken çalışan → kendi anahtarı.
+  String _sessionKey = 'unknown';
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkInitialStatus());
   }
 
-  void _checkInitialStatus() {
-    final b = context.read<BusinessProvider>();
-    final businessId = b.business?['id']?.toString() ?? 'unknown';
+  void _checkInitialStatus() async {
+    final key = await resolveWhatsAppSessionKey(context);
+    if (!mounted) return;
+    setState(() => _sessionKey = key);
     // Baska akislardan kalmis hata mesajini tasima.
     context.read<WhatsAppProvider>().clearError();
-    context.read<WhatsAppProvider>().checkStatus(businessId).then((_) {
+    context.read<WhatsAppProvider>().checkStatus(key).then((_) {
       if (!mounted) return;
       final provider = context.read<WhatsAppProvider>();
       // If server is reconnecting or pairing, start polling
       if (!provider.isConnected && provider.connectionStatus != null) {
-        _startStatusPolling(businessId);
+        _startStatusPolling(key);
       }
     });
   }
@@ -98,11 +104,9 @@ class _WhatsAppConnectScreenState extends State<WhatsAppConnectScreen> {
       internationalPhone = '90$internationalPhone';
     }
 
-    final businessProvider = context.read<BusinessProvider>();
-    final businessId = businessProvider.business?['id']?.toString() ?? 'unknown';
-
     final provider = context.read<WhatsAppProvider>();
-    final success = await provider.requestPairingCode(businessId, internationalPhone);
+    final success =
+        await provider.requestPairingCode(_sessionKey, internationalPhone);
 
     if (!mounted) return;
     setState(() => _isRequesting = false);
@@ -112,15 +116,19 @@ class _WhatsAppConnectScreenState extends State<WhatsAppConnectScreen> {
         _pairingCode = provider.pairingCode;
         _formattedPhone = internationalPhone;
       });
-      _startStatusPolling(businessId);
+      _startStatusPolling(_sessionKey);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<WhatsAppProvider>();
-    // Çalışan bağlantı durumunu görebilir, değiştiremez.
     final isAdmin = context.watch<AuthProvider>().isAdmin;
+    final shared =
+        context.watch<BusinessProvider>().business?['sharedWhatsapp'] == true;
+    // Ortak hat açıkken çalışan yalnızca durumu görür; kapalıyken kendi
+    // WhatsApp hesabını bağlayabilir.
+    final canManage = isAdmin || !shared;
 
     return Scaffold(
       appBar: AppBar(title: const Text('WhatsApp Baglantisi')),
@@ -136,8 +144,8 @@ class _WhatsAppConnectScreenState extends State<WhatsAppConnectScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Çalışan: yalnızca durum görünür, bağlantı kontrolleri gizli
-          if (!isAdmin)
+          // Ortak hat açıkken çalışan: yalnızca durum görünür
+          if (!canManage)
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -146,27 +154,54 @@ class _WhatsAppConnectScreenState extends State<WhatsAppConnectScreen> {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.lock_outline, size: 20, color: AppTheme.textSecondary),
+                  Icon(Icons.check_circle_outline,
+                      size: 20, color: AppTheme.success),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'WhatsApp baglantisini yalnizca isletme sahibi yonetebilir.',
-                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                      'İşletme sahibi ortak WhatsApp hattı kullanıyor, sizin bağlantı yapmanıza gerek yok.',
+                      style: TextStyle(color: AppTheme.success, fontSize: 13),
                     ),
                   ),
                 ],
               ),
             ),
 
+          // Çalışan kendi hattını bağlıyorsa bilgilendir
+          if (!isAdmin && canManage) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.person, size: 20, color: AppTheme.primary),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Bu işletmede her çalışan kendi WhatsApp hattını kullanır. Aşağıdan kendi numaranızı bağlayabilirsiniz.',
+                      style: TextStyle(color: AppTheme.primary, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
           // Phone input + button (only when no pairing code and not connected)
-          if (isAdmin && _pairingCode == null && !provider.isConnected) ...[
+          if (canManage && _pairingCode == null && !provider.isConnected) ...[
             TextField(
               controller: _phoneController,
               focusNode: _focusNode,
-              decoration: const InputDecoration(
-                labelText: 'Isletme Telefon Numarasi',
+              decoration: InputDecoration(
+                labelText: isAdmin
+                    ? 'Isletme Telefon Numarasi'
+                    : 'WhatsApp Telefon Numaraniz',
                 hintText: '05XX XXX XX XX',
-                prefixIcon: Icon(Icons.phone_android),
+                prefixIcon: const Icon(Icons.phone_android),
               ),
               keyboardType: TextInputType.phone,
               enabled: !_isRequesting,
@@ -189,30 +224,25 @@ class _WhatsAppConnectScreenState extends State<WhatsAppConnectScreen> {
           ],
 
           // Pairing code display
-          if (isAdmin && _pairingCode != null && !provider.isConnected) ...[
+          if (canManage && _pairingCode != null && !provider.isConnected) ...[
             _PairingCodeCard(
               code: _pairingCode!,
               phone: _formattedPhone,
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: () {
-                final b = context.read<BusinessProvider>();
-                context.read<WhatsAppProvider>().checkStatus(
-                    b.business?['id']?.toString() ?? 'unknown');
-              },
+              onPressed: () =>
+                  context.read<WhatsAppProvider>().checkStatus(_sessionKey),
               icon: const Icon(Icons.refresh),
               label: const Text('Baglantiyi Kontrol Et'),
             ),
           ],
 
           // Connected state
-          if (isAdmin && provider.isConnected) ...[
+          if (canManage && provider.isConnected) ...[
             _ConnectedCard(
               onDisconnect: () async {
-                final b = context.read<BusinessProvider>();
-                await context.read<WhatsAppProvider>().disconnect(
-                    b.business?['id']?.toString() ?? 'unknown');
+                await context.read<WhatsAppProvider>().disconnect(_sessionKey);
                 setState(() {
                   _pairingCode = null;
                   _formattedPhone = null;

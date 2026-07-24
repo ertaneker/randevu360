@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../providers/business_provider.dart';
 import '../../providers/finance_provider.dart';
+import '../../services/permission_service.dart';
 import '../../core/l10n/l10n_ext.dart';
 import '../../core/theme/app_theme.dart';
 import 'debtors_screen.dart';
@@ -10,17 +11,33 @@ import 'finance_stats_screen.dart';
 import 'transaction_list_screen.dart';
 
 class FinanceScreen extends StatefulWidget {
-  const FinanceScreen({super.key});
+  final VoidCallback? onMenu;
+
+  const FinanceScreen({super.key, this.onMenu});
 
   @override
   State<FinanceScreen> createState() => _FinanceScreenState();
 }
 
 class _FinanceScreenState extends State<FinanceScreen> {
+  bool _hasPermission = true;
+  bool _permissionLoaded = false;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkPermission());
+  }
+
+  Future<void> _checkPermission() async {
+    final allowed = await PermissionService.can(
+        context, EmployeePermissionKey.viewFinance);
+    if (!mounted) return;
+    setState(() {
+      _hasPermission = allowed;
+      _permissionLoaded = true;
+    });
+    if (allowed) _loadData();
   }
 
   void _loadData() {
@@ -49,6 +66,10 @@ class _FinanceScreenState extends State<FinanceScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: widget.onMenu,
+        ),
         title: Text(context.l10n.financeTitle),
         actions: [
           IconButton(
@@ -63,7 +84,23 @@ class _FinanceScreenState extends State<FinanceScreen> {
           ),
         ],
       ),
-      body: Consumer<FinanceProvider>(
+      body: !_permissionLoaded
+          ? const Center(child: CircularProgressIndicator())
+          : !_hasPermission
+              ? const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.lock_outline, size: 48, color: AppTheme.textSecondary),
+                      SizedBox(height: 16),
+                      Text(
+                        'Finans görüntüleme yetkiniz yok.',
+                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                )
+              : Consumer<FinanceProvider>(
         builder: (context, provider, _) {
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -204,24 +241,37 @@ class _FinanceScreenState extends State<FinanceScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const _AddTransactionSheet(),
+      builder: (_) => const TransactionEditSheet(),
     );
   }
 }
 
-class _AddTransactionSheet extends StatefulWidget {
-  const _AddTransactionSheet();
+class TransactionEditSheet extends StatefulWidget {
+  /// null ise yeni kayıt; doluysa mevcut işlem düzeltilir.
+  final Map<String, dynamic>? editing;
+
+  const TransactionEditSheet({super.key, this.editing});
 
   @override
-  State<_AddTransactionSheet> createState() => _AddTransactionSheetState();
+  State<TransactionEditSheet> createState() => _TransactionEditSheetState();
 }
 
-class _AddTransactionSheetState extends State<_AddTransactionSheet> {
-  final _amountCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
-  String _type = 'income';
-  String _paymentMethod = 'cash';
-  String? _category;
+class _TransactionEditSheetState extends State<TransactionEditSheet> {
+  late final _amountCtrl = TextEditingController(
+      text: widget.editing != null ? _formatAmount(widget.editing!['amount']) : '');
+  late final _descCtrl =
+      TextEditingController(text: widget.editing?['description']?.toString() ?? '');
+  late String _type = widget.editing?['type']?.toString() ?? 'income';
+  late String _paymentMethod = widget.editing?['paymentMethod']?.toString() ?? 'cash';
+  late String? _category = widget.editing?['category']?.toString();
+  bool _busy = false;
+
+  bool get _isEditing => widget.editing != null;
+
+  static String _formatAmount(dynamic amount) {
+    final d = (amount as num).toDouble();
+    return d == d.truncateToDouble() ? d.toStringAsFixed(0) : d.toString();
+  }
 
   @override
   void dispose() {
@@ -236,7 +286,7 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
     return names.isNotEmpty ? names.first : null;
   }
 
-  void _save() {
+  Future<void> _save() async {
     final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.'));
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -246,9 +296,11 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
     }
     final bizProv = context.read<BusinessProvider>();
     if (bizProv.business == null) return;
+    final businessId = bizProv.business!['id'];
 
     final now = DateTime.now();
-    final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final dateStr = widget.editing?['date']?.toString() ??
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
     final financeProvider = context.read<FinanceProvider>();
     final names = financeProvider.categoryNames(_type);
@@ -257,8 +309,8 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
             ? names.first
             : (_type == 'income' ? context.l10n.otherIncome : context.l10n.otherExpense));
 
-    financeProvider.addTransaction({
-      'businessId': bizProv.business!['id'],
+    final data = {
+      'businessId': businessId,
       'type': _type,
       'amount': amount,
       'category': category,
@@ -267,8 +319,64 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
       'appointmentId': null,
       'customerId': null,
       'date': dateStr,
-    });
+    };
+
+    setState(() => _busy = true);
+    final ok = _isEditing
+        ? await financeProvider.updateTransaction(widget.editing!['id'] as int, data)
+        : await financeProvider.addTransaction(data);
+    if (!mounted) return;
+
+    if (!ok) {
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(financeProvider.error ?? 'Kayıt başarısız'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+      return;
+    }
     Navigator.pop(context);
+  }
+
+  Future<void> _delete() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('İşlemi sil'),
+        content: const Text(
+            'Bu kayıt kalıcı olarak silinecek. Randevuya veya borca bağlıysa o kayıtlar otomatik güncellenmez.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Vazgeç')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sil', style: TextStyle(color: AppTheme.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    final businessId = context.read<BusinessProvider>().business?['id'] as int?;
+    if (businessId == null) return;
+
+    setState(() => _busy = true);
+    final ok = await context
+        .read<FinanceProvider>()
+        .deleteTransaction(widget.editing!['id'] as int, businessId);
+    if (!mounted) return;
+
+    if (ok) {
+      Navigator.pop(context);
+    } else {
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Silme başarısız'), backgroundColor: AppTheme.error),
+      );
+    }
   }
 
   @override
@@ -276,6 +384,9 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
     final names =
         context.watch<FinanceProvider>().categoryNames(_type);
     final selected = _validCategory(names);
+    // Guard: selected değeri items'ta yoksa null ver, crash olmasın
+    final safeSelected =
+        selected != null && names.contains(selected) ? selected : null;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -285,8 +396,23 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(context.l10n.addIncomeExpense, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _isEditing ? 'İşlemi Düzelt' : context.l10n.addIncomeExpense,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              if (_isEditing)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: AppTheme.error),
+                  tooltip: 'Sil',
+                  onPressed: _busy ? null : _delete,
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
           // Type toggle
           SegmentedButton<String>(
             segments: [
@@ -308,7 +434,7 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
             key: ValueKey('category_$_type'),
-            initialValue: selected,
+            initialValue: safeSelected,
             decoration: InputDecoration(labelText: context.l10n.categoryField),
             items: names
                 .map((n) => DropdownMenuItem(value: n, child: Text(n)))
@@ -335,8 +461,14 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _save,
-              child: Text(context.l10n.save),
+              onPressed: _busy ? null : _save,
+              child: _busy
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                    )
+                  : Text(context.l10n.save),
             ),
           ),
           const SizedBox(height: 24),
@@ -355,6 +487,11 @@ class _TransactionTile extends StatelessWidget {
     final isIncome = tx['type'] == 'income';
     return Card(
       child: ListTile(
+        onTap: () => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          builder: (_) => TransactionEditSheet(editing: tx),
+        ),
         leading: CircleAvatar(
           backgroundColor: (isIncome ? AppTheme.success : AppTheme.error).withValues(alpha: 0.1),
           child: Icon(isIncome ? Icons.arrow_upward : Icons.arrow_downward,

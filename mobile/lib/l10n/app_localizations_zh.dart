@@ -9,7 +9,7 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get appTitle => 'Randevu 360';
+  String get appTitle => 'Esnaf Takvim';
 
   @override
   String get save => '保存';
@@ -802,7 +802,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get businessInfoTitle => '企业信息';
 
   @override
-  String get businessSetupSubtitle => '设置您的企业以开始使用 Randevu 360';
+  String get businessSetupSubtitle => '设置您的企业以开始使用 Esnaf Takvim';
 
   @override
   String get businessNameField => '企业名称';
@@ -1016,4 +1016,37 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get languageSystemDefault => '跟随系统';
+
+  @override
+  String get gridView => 'Grid View';
+
+  @override
+  String get listView => 'List View';
+
+  @override
+  String get scheduleTitle => 'Schedule';
+
+  @override
+  String get tapToAddAppointment => 'Tap to add appointment';
+
+  @override
+  String get employeeColor => 'Employee color';
+
+  @override
+  String get gridDisplayHours => 'Grid display hours';
+
+  @override
+  String get gridStartHour => 'Start hour';
+
+  @override
+  String get gridEndHour => 'End hour';
+
+  @override
+  String get gridSettingsSaved => 'Grid settings saved';
+
+  @override
+  String get changeColor => 'Change Color';
+
+  @override
+  String get selectColor => 'Select Color';
 }

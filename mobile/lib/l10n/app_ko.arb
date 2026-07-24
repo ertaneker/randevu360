@@ -1,6 +1,6 @@
 {
   "@@locale": "ko",
-  "appTitle": "Randevu 360",
+  "appTitle": "Esnaf Takvim",
   "save": "저장",
   "cancel": "취소",
   "delete": "삭제",
@@ -290,7 +290,7 @@
 
   "defineBusiness": "비즈니스 설정",
   "businessInfoTitle": "비즈니스 정보",
-  "businessSetupSubtitle": "Randevu 360을 사용하려면 비즈니스를 설정하세요",
+  "businessSetupSubtitle": "Esnaf Takvim을 사용하려면 비즈니스를 설정하세요",
   "businessNameField": "비즈니스 이름",
   "businessNameRequired": "비즈니스 이름이 필요합니다",
   "addressField": "주소",

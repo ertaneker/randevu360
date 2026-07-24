@@ -1,6 +1,6 @@
 {
   "@@locale": "ar",
-  "appTitle": "Randevu 360",
+  "appTitle": "Esnaf Takvim",
   "save": "حفظ",
   "cancel": "إلغاء",
   "delete": "حذف",
@@ -290,7 +290,7 @@
 
   "defineBusiness": "إعداد نشاطك التجاري",
   "businessInfoTitle": "معلومات النشاط التجاري",
-  "businessSetupSubtitle": "قم بإعداد نشاطك التجاري لاستخدام Randevu 360",
+  "businessSetupSubtitle": "قم بإعداد نشاطك التجاري لاستخدام Esnaf Takvim",
   "businessNameField": "اسم النشاط التجاري",
   "businessNameRequired": "اسم النشاط التجاري مطلوب",
   "addressField": "العنوان",

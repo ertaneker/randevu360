@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:firebase_auth/firebase_auth.dart' show User, UserCredential;
 
-import 'package:randevu360/core/auth/auth_service.dart';
-import 'package:randevu360/providers/auth_provider.dart';
+import 'package:esnaftakvim/core/auth/auth_service.dart';
+import 'package:esnaftakvim/providers/auth_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Manual mock for IAuthService — no real Firebase calls, usable in tests

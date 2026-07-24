@@ -9,7 +9,7 @@ class AppLocalizationsKo extends AppLocalizations {
   AppLocalizationsKo([String locale = 'ko']) : super(locale);
 
   @override
-  String get appTitle => 'Randevu 360';
+  String get appTitle => 'Esnaf Takvim';
 
   @override
   String get save => '저장';
@@ -805,7 +805,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get businessInfoTitle => '비즈니스 정보';
 
   @override
-  String get businessSetupSubtitle => 'Randevu 360을 사용하려면 비즈니스를 설정하세요';
+  String get businessSetupSubtitle => 'Esnaf Takvim을 사용하려면 비즈니스를 설정하세요';
 
   @override
   String get businessNameField => '비즈니스 이름';
@@ -1021,4 +1021,37 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get languageSystemDefault => '시스템 기본값';
+
+  @override
+  String get gridView => 'Grid View';
+
+  @override
+  String get listView => 'List View';
+
+  @override
+  String get scheduleTitle => 'Schedule';
+
+  @override
+  String get tapToAddAppointment => 'Tap to add appointment';
+
+  @override
+  String get employeeColor => 'Employee color';
+
+  @override
+  String get gridDisplayHours => 'Grid display hours';
+
+  @override
+  String get gridStartHour => 'Start hour';
+
+  @override
+  String get gridEndHour => 'End hour';
+
+  @override
+  String get gridSettingsSaved => 'Grid settings saved';
+
+  @override
+  String get changeColor => 'Change Color';
+
+  @override
+  String get selectColor => 'Select Color';
 }

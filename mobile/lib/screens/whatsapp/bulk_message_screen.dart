@@ -4,6 +4,8 @@ import '../../providers/customer_provider.dart';
 import '../../providers/business_provider.dart';
 import '../../providers/whatsapp_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../services/permission_service.dart';
+import '../../services/whatsapp_session.dart';
 import '../customer/customer_detail_screen.dart';
 
 class BulkMessageScreen extends StatefulWidget {
@@ -49,6 +51,9 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   }
 
   Future<void> _send() async {
+    final waProvider = context.read<WhatsAppProvider>();
+    final customers = context.read<CustomerProvider>().customers;
+
     if (_selectedCustomerIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('En az bir musteri secin'), backgroundColor: AppTheme.warning),
@@ -62,11 +67,24 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       return;
     }
 
-    setState(() => _isSending = true);
+    if (!await PermissionService.can(
+        context, EmployeePermissionKey.bulkWhatsapp)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Toplu mesaj gönderme yetkiniz yok.'),
+            backgroundColor: AppTheme.warning,
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
 
-    final business = context.read<BusinessProvider>().business;
-    final waProvider = context.read<WhatsAppProvider>();
-    final customers = context.read<CustomerProvider>().customers;
+    final sessionKey = await resolveWhatsAppSessionKey(context);
+    if (!mounted) return;
+
+    setState(() => _isSending = true);
 
     final selectedCustomers = customers
         .where((c) => _selectedCustomerIds.contains(c['id'] as int))
@@ -88,11 +106,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
       }
 
       final message = _substituteTemplate(_messageController.text.trim(), c);
-      final success = await waProvider.sendMessage(
-        business?['id']?.toString() ?? 'unknown',
-        phone,
-        message,
-      );
+      final success = await waProvider.sendMessage(sessionKey, phone, message);
 
       if (success) {
         sent++;
@@ -202,12 +216,20 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
               controller: _searchController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Isim veya telefona gore ara...',
-                prefixIcon: Icon(Icons.search),
-                suffixIcon: Icon(Icons.clear),
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(vertical: 10),
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                border: const OutlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
               ),
               onChanged: (v) => setState(() => _searchQuery = v),
             ),

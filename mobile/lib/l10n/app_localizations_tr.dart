@@ -9,7 +9,7 @@ class AppLocalizationsTr extends AppLocalizations {
   AppLocalizationsTr([String locale = 'tr']) : super(locale);
 
   @override
-  String get appTitle => 'Randevu 360';
+  String get appTitle => 'Esnaf Takvim';
 
   @override
   String get save => 'Kaydet';
@@ -815,7 +815,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get businessSetupSubtitle =>
-      'Randevu 360\'ı kullanmak için işletmenizi tanımlayın';
+      'Esnaf Takvim\'i kullanmak için işletmenizi tanımlayın';
 
   @override
   String get businessNameField => 'İşletme Adı';
@@ -1034,4 +1034,37 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get languageSystemDefault => 'Cihaz dilini kullan';
+
+  @override
+  String get gridView => 'Grid View';
+
+  @override
+  String get listView => 'List View';
+
+  @override
+  String get scheduleTitle => 'Schedule';
+
+  @override
+  String get tapToAddAppointment => 'Tap to add appointment';
+
+  @override
+  String get employeeColor => 'Employee color';
+
+  @override
+  String get gridDisplayHours => 'Grid display hours';
+
+  @override
+  String get gridStartHour => 'Start hour';
+
+  @override
+  String get gridEndHour => 'End hour';
+
+  @override
+  String get gridSettingsSaved => 'Grid settings saved';
+
+  @override
+  String get changeColor => 'Change Color';
+
+  @override
+  String get selectColor => 'Select Color';
 }

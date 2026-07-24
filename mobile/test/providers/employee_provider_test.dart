@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:randevu360/providers/employee_provider.dart';
+import 'package:esnaftakvim/providers/employee_provider.dart';
 
 // ---------------------------------------------------------------------------
 // EmployeeProvider — unit tests for state management and computed properties.

@@ -1,6 +1,6 @@
 {
   "@@locale": "en",
-  "appTitle": "Randevu 360",
+  "appTitle": "Esnaf Takvim",
   "save": "Save",
   "cancel": "Cancel",
   "delete": "Delete",
@@ -290,7 +290,7 @@
 
   "defineBusiness": "Set up your business",
   "businessInfoTitle": "Business information",
-  "businessSetupSubtitle": "Set up your business to start using Randevu 360",
+  "businessSetupSubtitle": "Set up your business to start using Esnaf Takvim",
   "businessNameField": "Business name",
   "businessNameRequired": "Business name is required",
   "addressField": "Address",
@@ -366,5 +366,17 @@
   "freqMonthly": "Once a month",
 
   "languageLabel": "Language",
-  "languageSystemDefault": "System default"
+  "languageSystemDefault": "System default",
+
+  "gridView": "Grid View",
+  "listView": "List View",
+  "scheduleTitle": "Schedule",
+  "tapToAddAppointment": "Tap to add appointment",
+  "employeeColor": "Employee color",
+  "gridDisplayHours": "Grid display hours",
+  "gridStartHour": "Start hour",
+  "gridEndHour": "End hour",
+  "gridSettingsSaved": "Grid settings saved",
+  "changeColor": "Change Color",
+  "selectColor": "Select Color"
 }

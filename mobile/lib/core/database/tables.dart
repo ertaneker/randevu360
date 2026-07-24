@@ -1,4 +1,39 @@
 import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
+
+const _uuid = Uuid();
+
+/// Senkron alanları tek formatta üretir: UTC ISO-8601.
+/// String karşılaştırmasıyla (LWW) sıralanabilir olması için tüm cihazlar
+/// aynı format ve dilimi (UTC) kullanmak zorunda.
+String newSyncTimestamp() => DateTime.now().toUtc().toIso8601String();
+
+/// Yeni satır UUID'si. Public olmalı: clientDefault ifadesi üretilen
+/// database_service.g.dart içine kopyalanır ve oradan erişilir.
+String newRowUid() => _uuid.v4();
+
+/// Cihazlar arası senkronlanan tabloların ortak kolonları.
+///
+/// - [rowUid]: global satır kimliği (UUID). Yerel int id'ler cihaza özeldir;
+///   cihazlar arası eşleşme bununla yapılır. FK'ler Firestore dokümanında
+///   rowUid olarak taşınır.
+/// - [syncUpdatedAt]: son içerik değişikliği (UTC ISO). LWW çakışma çözümü
+///   bu alanla yapılır. UPDATE'lerde SQL trigger otomatik günceller
+///   (bkz. DatabaseService._syncTriggerSql).
+/// - [deletedAt]: tombstone — silinen satır fiziksel silinmez, bu alan
+///   dolar ve diğer cihazlara yayılır.
+/// - [lastSyncedAt]: en son push/pull edilen syncUpdatedAt değeri.
+///   `syncUpdatedAt != lastSyncedAt` ⇒ satır kirli, push edilecek.
+///
+/// Kolonlar nullable: SQLite `ALTER TABLE ADD COLUMN NOT NULL` default'suz
+/// eklemeye izin vermez; eski satırlar migration sonrası backfill edilir.
+mixin SyncColumns on Table {
+  TextColumn get rowUid => text().nullable().clientDefault(newRowUid)();
+  TextColumn get syncUpdatedAt =>
+      text().nullable().clientDefault(newSyncTimestamp)();
+  TextColumn get deletedAt => text().nullable()();
+  TextColumn get lastSyncedAt => text().nullable()();
+}
 
 // ──── İŞLETME ────
 @DataClassName('Business')
@@ -16,13 +51,16 @@ class Businesses extends Table {
   TextColumn get workingDays => text()(); // JSON array: ["mon","tue",...]
   TextColumn get workingHours => text()(); // JSON: {"start":"09:00","end":"19:00"}
   TextColumn get status => text().withDefault(const Constant('active'))();
+  // Varsayılan true: mevcut davranış tek hat (yöneticinin hattı). Kapatılırsa
+  // her çalışan kendi WhatsApp hesabını bağlar.
+  BoolColumn get sharedWhatsapp => boolean().withDefault(const Constant(true))();
   TextColumn get createdAt => text()();
   TextColumn get updatedAt => text()();
 }
 
 // ──── ÇALIŞAN ────
 @DataClassName('Employee')
-class Employees extends Table {
+class Employees extends Table with SyncColumns {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get businessId => integer().references(Businesses, #id)();
   TextColumn get name => text()();
@@ -37,7 +75,7 @@ class Employees extends Table {
 
 // ──── MÜŞTERİ ────
 @DataClassName('Customer')
-class Customers extends Table {
+class Customers extends Table with SyncColumns {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get businessId => integer().references(Businesses, #id)();
   TextColumn get name => text()();
@@ -51,7 +89,7 @@ class Customers extends Table {
 
 // ──── HİZMET ────
 @DataClassName('Service')
-class Services extends Table {
+class Services extends Table with SyncColumns {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get businessId => integer().references(Businesses, #id)();
   TextColumn get name => text()();
@@ -64,7 +102,7 @@ class Services extends Table {
 
 // ──── RANDEVU ────
 @DataClassName('Appointment')
-class Appointments extends Table {
+class Appointments extends Table with SyncColumns {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get businessId => integer().references(Businesses, #id)();
   IntColumn get customerId => integer().references(Customers, #id)();
@@ -72,6 +110,7 @@ class Appointments extends Table {
   IntColumn get serviceId => integer().references(Services, #id).nullable()();
   TextColumn get date => text()(); // YYYY-MM-DD
   TextColumn get time => text()(); // HH:MM
+  TextColumn get endTime => text().nullable()(); // HH:MM — boşsa süre = ayarlardaki periyot
   RealColumn get price => real().nullable()();
   TextColumn get status => text().withDefault(const Constant('pending'))(); // pending/confirmed/completed/cancelled
   TextColumn get note => text().nullable()();
@@ -98,7 +137,7 @@ class AppointmentLogs extends Table {
 
 // ──── GELİR/GİDER ────
 @DataClassName('Transaction')
-class Transactions extends Table {
+class Transactions extends Table with SyncColumns {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get businessId => integer().references(Businesses, #id)();
   TextColumn get type => text()(); // income / expense
@@ -114,7 +153,7 @@ class Transactions extends Table {
 
 // ──── MÜŞTERİ BORÇ ────
 @DataClassName('Debt')
-class Debts extends Table {
+class Debts extends Table with SyncColumns {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get businessId => integer().references(Businesses, #id)();
   IntColumn get customerId => integer().references(Customers, #id)();
@@ -129,7 +168,7 @@ class Debts extends Table {
 
 // ──── GELİR/GİDER KATEGORİLERİ ────
 @DataClassName('TransactionCategory')
-class TransactionCategories extends Table {
+class TransactionCategories extends Table with SyncColumns {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get businessId => integer().references(Businesses, #id)();
   TextColumn get name => text()();
@@ -162,4 +201,19 @@ class WorkingHours extends Table {
   TextColumn get startTime => text()(); // HH:MM
   TextColumn get endTime => text()(); // HH:MM
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+}
+
+// ──── ÇALIŞAN İZİNLERİ ────
+@DataClassName('EmployeePermission')
+class EmployeePermissions extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get employeeId => integer().references(Employees, #id)();
+  IntColumn get businessId => integer().references(Businesses, #id)();
+  BoolColumn get canSendWhatsapp => boolean().withDefault(const Constant(true))();
+  BoolColumn get canBulkWhatsapp => boolean().withDefault(const Constant(true))();
+  BoolColumn get canViewFinance => boolean().withDefault(const Constant(true))();
+  BoolColumn get canManageServices => boolean().withDefault(const Constant(false))();
+  BoolColumn get canManageEmployees => boolean().withDefault(const Constant(false))();
+  TextColumn get createdAt => text()();
+  TextColumn get updatedAt => text()();
 }

@@ -17,7 +17,7 @@ class TermsScreen extends StatelessWidget {
             SizedBox(height: 16),
             _Section(
               title: '1. Kabul',
-              content: 'Randevu 360 uygulamasını kullanarak bu koşulları kabul etmiş olursunuz. Uygulama, randevu yönetimi ve müşteri iletişimi amacıyla tasarlanmıştır.',
+              content: 'Esnaf Takvim uygulamasını kullanarak bu koşulları kabul etmiş olursunuz. Uygulama, randevu yönetimi ve müşteri iletişimi amacıyla tasarlanmıştır.',
             ),
             _Section(
               title: '2. Hesap',
@@ -33,7 +33,7 @@ class TermsScreen extends StatelessWidget {
             ),
             _Section(
               title: '5. Sorumluluk',
-              content: 'Randevu 360 bir araçtır. Randevuların doğru yönetilmesi, müşteri iletişimi ve finansal kayıtların doğruluğu kullanıcının sorumluluğundadır.',
+              content: 'Esnaf Takvim bir araçtır. Randevuların doğru yönetilmesi, müşteri iletişimi ve finansal kayıtların doğruluğu kullanıcının sorumluluğundadır.',
             ),
             _Section(
               title: '6. Değişiklikler',

@@ -63,16 +63,18 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          Icons.calendar_month_rounded,
-                          size: 60,
-                          color: Colors.white,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(30),
+                          child: Image.asset(
+                            'assets/icon/logo.png',
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 24),
 
                       const Text(
-                        'Randevu 360',
+                        'Esnaf Takvim',
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,

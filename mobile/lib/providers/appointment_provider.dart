@@ -1,10 +1,26 @@
 import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import '../core/database/database_service.dart';
+import '../core/backup/backup_service.dart';
+import '../services/data_sync_service.dart';
 
 class AppointmentProvider extends ChangeNotifier {
   DatabaseService? _db;
+  BackupService? _backupService;
   void setDatabase(DatabaseService db) { _db = db; }
+
+  /// Lazy-init backup and fire-and-forget a Drive backup.
+  /// Sessiz giriş kullanılır — randevu kaydederken Google izin ekranı
+  /// açılmamalı; izin hiç verilmemişse yedek sessizce atlanır.
+  /// Errors are silently caught — never blocks the caller.
+  void _triggerBackup() {
+    try {
+      _backupService ??= BackupService();
+      _backupService!.authenticateSilently().then((ok) {
+        if (ok) _backupService!.backup(_db!);
+      });
+    } catch (_) {}
+  }
 
   List<Map<String, dynamic>> _appointments = [];
   Map<String, dynamic>? _selectedAppointment;
@@ -39,6 +55,18 @@ class AppointmentProvider extends ChangeNotifier {
           .toList();
     }
     return filtered;
+  }
+
+  /// Seçili günün randevularını çalışan ID'sine göre gruplandırır.
+  /// Grid görünümünde her çalışan sütunundaki hücreleri doldurmak için.
+  Map<int, List<Map<String, dynamic>>> get selectedDayAppointmentsByEmployee {
+    final result = <int, List<Map<String, dynamic>>>{};
+    for (final apt in selectedDayAppointments) {
+      final empId = apt['employeeId'] as int?;
+      if (empId == null) continue;
+      result.putIfAbsent(empId, () => []).add(apt);
+    }
+    return result;
   }
 
   // İstatistikler
@@ -86,6 +114,7 @@ class AppointmentProvider extends ChangeNotifier {
         serviceId: Value(data['serviceId']),
         date: Value(data['date']),
         time: Value(data['time']),
+        endTime: Value(data['endTime']),
         price: Value(data['price']),
         note: Value(data['note'] ?? ''),
         createdBy: Value(data['createdBy']),
@@ -104,6 +133,8 @@ class AppointmentProvider extends ChangeNotifier {
 
       // Reload appointments after creating to refresh the list
       await loadAppointments(data['businessId']);
+      _triggerBackup();
+      DataSyncService.instance.nudge();
       return appointmentId;
     } catch (e) {
       _error = e.toString();
@@ -132,6 +163,8 @@ class AppointmentProvider extends ChangeNotifier {
         _appointments[index]['status'] = status;
         notifyListeners();
       }
+      _triggerBackup();
+      DataSyncService.instance.nudge();
       return true;
     } catch (e) {
       _error = e.toString();

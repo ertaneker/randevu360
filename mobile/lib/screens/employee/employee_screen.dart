@@ -5,9 +5,12 @@ import '../../providers/business_provider.dart';
 import '../../providers/employee_provider.dart';
 import '../../core/l10n/l10n_ext.dart';
 import '../../core/theme/app_theme.dart';
+import '../settings/employee_permissions_screen.dart';
 
 class EmployeeScreen extends StatefulWidget {
-  const EmployeeScreen({super.key});
+  final VoidCallback? onMenu;
+
+  const EmployeeScreen({super.key, this.onMenu});
 
   @override
   State<EmployeeScreen> createState() => _EmployeeScreenState();
@@ -69,13 +72,24 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: widget.onMenu,
+        ),
         title: Text(context.l10n.employeesTitle),
         actions: [
-          if (isAdmin)
+          if (isAdmin) ...[
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings),
+              tooltip: 'Yetkilendirme',
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const EmployeePermissionsScreen())),
+            ),
             IconButton(
               icon: const Icon(Icons.person_add),
               onPressed: () => _showAddEmployeeDialog(context),
             ),
+          ],
         ],
       ),
       body: Consumer<EmployeeProvider>(
@@ -159,11 +173,12 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
                     itemBuilder: (context, i) {
                       final emp = filtered[i];
               final isAdminEmp = emp['role'] == 'admin';
+              final empColor = AppTheme.parseHex(emp['color'] as String? ?? '#6C63FF');
               return Card(
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: (isAdminEmp ? AppTheme.primary : AppTheme.secondary).withValues(alpha: 0.1),
-                    child: Icon(Icons.person, color: isAdminEmp ? AppTheme.primary : AppTheme.secondary),
+                    backgroundColor: empColor.withValues(alpha: 0.15),
+                    child: Icon(Icons.person, color: empColor),
                   ),
                   title: Text(emp['name'] ?? ''),
                   subtitle: Text(emp['email'] ?? ''),
@@ -188,6 +203,10 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
                       if (isAdmin)
                         PopupMenuButton(
                           itemBuilder: (_) => [
+                            PopupMenuItem(
+                              child: const Text('Renk Değiştir'),
+                              onTap: () => _showColorPicker(emp, provider),
+                            ),
                             PopupMenuItem(
                               child: Text(isAdminEmp
                                   ? context.l10n.makeEmployee
@@ -264,6 +283,53 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
       ),
     );
   }
+
+  void _showColorPicker(Map<String, dynamic> emp, EmployeeProvider provider) {
+    final currentColor = emp['color'] as String? ?? '#6C63FF';
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Renk Seç — ${emp['name']}',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: AppTheme.employeeColorPalette.map((hex) {
+                final selected = hex == currentColor;
+                return GestureDetector(
+                  onTap: () {
+                    provider.updateColor(emp['id'] as int, hex);
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      color: AppTheme.parseHex(hex),
+                      shape: BoxShape.circle,
+                      border: selected
+                          ? Border.all(color: Colors.white, width: 3)
+                          : null,
+                      boxShadow: selected
+                          ? [BoxShadow(color: AppTheme.parseHex(hex).withValues(alpha: 0.5), blurRadius: 8)]
+                          : null,
+                    ),
+                    child: selected
+                        ? const Icon(Icons.check, color: Colors.white, size: 20)
+                        : null,
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _AddEmployeeDialog extends StatefulWidget {
@@ -278,6 +344,7 @@ class _AddEmployeeDialogState extends State<_AddEmployeeDialog> {
   final _phoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   String _role = 'employee';
+  String _selectedColor = '#6C63FF';
   bool _saving = false;
 
   Future<void> _save(BuildContext context) async {
@@ -337,6 +404,7 @@ class _AddEmployeeDialogState extends State<_AddEmployeeDialog> {
       'phone': _phoneCtrl.text.trim(),
       'email': email,
       'role': _role,
+      'color': _selectedColor,
     });
 
     if (!context.mounted) return;
@@ -371,25 +439,56 @@ class _AddEmployeeDialogState extends State<_AddEmployeeDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(context.l10n.addEmployee),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(controller: _nameCtrl, decoration: InputDecoration(labelText: context.l10n.fullNameField)),
-          const SizedBox(height: 12),
-          TextField(controller: _phoneCtrl, decoration: InputDecoration(labelText: context.l10n.phoneOnlyField), keyboardType: TextInputType.phone),
-          const SizedBox(height: 12),
-          TextField(controller: _emailCtrl, decoration: InputDecoration(labelText: context.l10n.emailField)),
-          const SizedBox(height: 12),
-          DropdownButtonFormField(
-            initialValue: _role,
-            items: [
-              DropdownMenuItem(value: 'employee', child: Text(context.l10n.roleEmployee)),
-              DropdownMenuItem(value: 'admin', child: Text(context.l10n.roleAdmin)),
-            ],
-            onChanged: (v) => setState(() => _role = v ?? 'employee'),
-            decoration: InputDecoration(labelText: context.l10n.roleField),
-          ),
-        ],
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: _nameCtrl, decoration: InputDecoration(labelText: context.l10n.fullNameField)),
+            const SizedBox(height: 12),
+            TextField(controller: _phoneCtrl, decoration: InputDecoration(labelText: context.l10n.phoneOnlyField), keyboardType: TextInputType.phone),
+            const SizedBox(height: 12),
+            TextField(controller: _emailCtrl, decoration: InputDecoration(labelText: context.l10n.emailField)),
+            const SizedBox(height: 12),
+            // Renk seçimi
+            Text('Renk', style: TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8, runSpacing: 8,
+              children: AppTheme.employeeColorPalette.map((hex) {
+                final selected = hex == _selectedColor;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedColor = hex),
+                  child: Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(
+                      color: AppTheme.parseHex(hex),
+                      shape: BoxShape.circle,
+                      border: selected
+                          ? Border.all(color: Colors.white, width: 2)
+                          : null,
+                      boxShadow: selected
+                          ? [BoxShadow(color: AppTheme.parseHex(hex).withValues(alpha: 0.5), blurRadius: 4)]
+                          : null,
+                    ),
+                    child: selected
+                        ? const Icon(Icons.check, color: Colors.white, size: 16)
+                        : null,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField(
+              initialValue: _role,
+              items: [
+                DropdownMenuItem(value: 'employee', child: Text(context.l10n.roleEmployee)),
+                DropdownMenuItem(value: 'admin', child: Text(context.l10n.roleAdmin)),
+              ],
+              onChanged: (v) => setState(() => _role = v ?? 'employee'),
+              decoration: InputDecoration(labelText: context.l10n.roleField),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.cancel)),

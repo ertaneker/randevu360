@@ -10,7 +10,9 @@ import 'customer_detail_screen.dart';
 /// Kayıtlı müşteriler: arama, filtreleme (kaynak / borçlu) ve müşteri ekleme.
 /// Alt bardaki "Müşteriler" sekmesinden açılır.
 class CustomersScreen extends StatefulWidget {
-  const CustomersScreen({super.key});
+  final VoidCallback? onMenu;
+
+  const CustomersScreen({super.key, this.onMenu});
 
   @override
   State<CustomersScreen> createState() => _CustomersScreenState();
@@ -80,7 +82,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.customersTitle)),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: widget.onMenu,
+        ),
+        title: Text(context.l10n.customersTitle),
+      ),
       floatingActionButton: FloatingActionButton(
         tooltip: context.l10n.addCustomerTooltip,
         onPressed: () => Navigator.pushNamed(context, '/add-customer')

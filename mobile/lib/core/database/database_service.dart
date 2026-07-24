@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
 import 'tables.dart';
 
 part 'database_service.g.dart';
@@ -20,12 +22,32 @@ part 'database_service.g.dart';
   MessageLogs,
   WorkingHours,
   TransactionCategories,
+  EmployeePermissions,
 ])
 class DatabaseService extends _$DatabaseService {
   DatabaseService() : super(_openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 6;
+
+  /// Cihazlar arası senkronlanan tablolar — bağımlılık sırasıyla
+  /// (önce ebeveynler: FK çevirisi pull sırasında ebeveyni bulabilsin).
+  List<TableInfo<Table, dynamic>> get syncedTables => [
+        employees,
+        customers,
+        services,
+        transactionCategories,
+        appointments,
+        transactions,
+        debts,
+      ];
+
+  static const List<String> _syncColumnNames = [
+    'row_uid',
+    'sync_updated_at',
+    'deleted_at',
+    'last_synced_at',
+  ];
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -39,8 +61,77 @@ class DatabaseService extends _$DatabaseService {
       if (from < 3) {
         await m.createTable(transactionCategories);
       }
+      if (from < 4) {
+        await m.createTable(employeePermissions);
+        await m.addColumn(businesses, businesses.sharedWhatsapp);
+      }
+      if (from < 5) {
+        // Cihazlar arası senkron kolonları (SyncColumns mixin)
+        for (final table in syncedTables) {
+          for (final name in _syncColumnNames) {
+            await m.addColumn(table, table.columnsByName[name]!);
+          }
+        }
+      }
+      if (from < 6) {
+        await m.addColumn(appointments, appointments.endTime);
+      }
+    },
+    beforeOpen: (details) async {
+      await _ensureSyncInfrastructure();
+      // Eski duplike satırları temizle (iki cihaz bağımsız push yaptıysa)
+      try {
+        await cleanupDuplicateRows();
+      } catch (_) {
+        // Temizlik başarısız olursa akışı bozma
+      }
     },
   );
+
+  /// Senkron altyapısını idempotent kurar: UUID/timestamp backfill,
+  /// row_uid unique index'leri ve UPDATE trigger'ları.
+  ///
+  /// Trigger, uygulama kodundaki HERHANGİ bir UPDATE'te syncUpdatedAt'i
+  /// otomatik bumplar — provider'larda dokunma noktası gerekmez. Koşul,
+  /// senkron motorunun kendi yazımlarını (pull-apply: sync_updated_at
+  /// değişir; push-mark: last_synced_at değişir) dışarıda bırakır, yoksa
+  /// sonsuz push döngüsü oluşurdu.
+  Future<void> _ensureSyncInfrastructure() async {
+    for (final table in syncedTables) {
+      final t = table.actualTableName;
+
+      // Backfill: eski satırlara UUID (satır başına tek tek — her satıra
+      // farklı değer gerekir) ve senkron zamanı.
+      final missing = await customSelect(
+        'SELECT id FROM $t WHERE row_uid IS NULL',
+      ).get();
+      for (final row in missing) {
+        await customStatement(
+          'UPDATE $t SET row_uid = ? WHERE id = ?',
+          [const Uuid().v4(), row.data['id']],
+        );
+      }
+      await customStatement(
+        "UPDATE $t SET sync_updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') "
+        'WHERE sync_updated_at IS NULL',
+      );
+
+      await customStatement(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_${t}_row_uid ON $t (row_uid)',
+      );
+      await customStatement('''
+        CREATE TRIGGER IF NOT EXISTS trg_${t}_sync_touch
+        AFTER UPDATE ON $t
+        FOR EACH ROW
+        WHEN NEW.sync_updated_at IS OLD.sync_updated_at
+         AND NEW.last_synced_at IS OLD.last_synced_at
+        BEGIN
+          UPDATE $t SET sync_updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+          WHERE id = NEW.id;
+        END
+      ''');
+    }
+  }
 
   /// Veritabanının tutarlı bir kopyasını [targetPath] konumuna yazar
   /// (Google Drive yedeklemesi için; açık DB dosyasını kopyalamak güvenli değil).
@@ -49,10 +140,20 @@ class DatabaseService extends _$DatabaseService {
     await customStatement("VACUUM INTO '$escaped'");
   }
 
+  /// Tüm tablolardaki verileri siler (cihazda başka işletmeye ait veri
+  /// kaldığında taze kurulum için). Şema korunur.
+  Future<void> wipeAllData() async {
+    await transaction(() async {
+      for (final table in allTables) {
+        await delete(table).go();
+      }
+    });
+  }
+
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
       final dir = await getApplicationDocumentsDirectory();
-      final file = File(p.join(dir.path, 'randevu360.db'));
+      final file = File(p.join(dir.path, 'esnaftakvim.db'));
 
       // Drive'dan indirilen yedek varsa DB açılmadan önce devreye al.
       // WAL/SHM/journal dosyaları eski veritabanına ait — kalırlarsa
@@ -109,6 +210,31 @@ extension BusinessQueries on DatabaseService {
     return (update(businesses)..where((t) => t.id.equals(id)))
         .write(BusinessesCompanion(remoteId: Value(remoteId)));
   }
+
+  Future<int> setSharedWhatsapp(int id, bool value) {
+    return (update(businesses)..where((t) => t.id.equals(id)))
+        .write(BusinessesCompanion(sharedWhatsapp: Value(value)));
+  }
+
+  /// Çalışan cihazında Firestore'dan gelen çalışma saatlerini
+  /// direkt DB'ye yazar (saveBusiness'tan bağımsız, Firestore yazma yok).
+  Future<void> updateBusinessWorkingHours(int id, {
+    required Map<String, dynamic> workingHours,
+    List<dynamic>? workingDays,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    if (workingDays != null) {
+      await customStatement(
+        'UPDATE businesses SET working_hours = ?, working_days = ?, updated_at = ? WHERE id = ?',
+        [jsonEncode(workingHours), jsonEncode(workingDays), now, id],
+      );
+    } else {
+      await customStatement(
+        'UPDATE businesses SET working_hours = ?, updated_at = ? WHERE id = ?',
+        [jsonEncode(workingHours), now, id],
+      );
+    }
+  }
 }
 
 // --- Employee Queries ---
@@ -117,18 +243,32 @@ extension EmployeeQueries on DatabaseService {
       into(employees).insert(emp);
 
   Future<List<Employee>> getEmployees(int businessId) =>
-      (select(employees)..where((t) => t.businessId.equals(businessId))).get();
+      (select(employees)
+            ..where((t) => t.businessId.equals(businessId) & t.deletedAt.isNull()))
+          .get();
 
   Future<Employee?> getEmployeeByEmail(String email) =>
-      (select(employees)..where((t) => t.email.equals(email))).getSingleOrNull();
+      (select(employees)
+            ..where((t) => t.email.equals(email) & t.deletedAt.isNull()))
+          .getSingleOrNull();
 
   Future<int> updateEmployeeRole(int id, String role) {
     return (update(employees)..where((t) => t.id.equals(id)))
         .write(EmployeesCompanion(role: Value(role)));
   }
 
-  Future<int> deleteEmployee(int id) {
-    return (delete(employees)..where((t) => t.id.equals(id))).go();
+  Future<int> updateEmployeeColor(int id, String color) {
+    return (update(employees)..where((t) => t.id.equals(id)))
+        .write(EmployeesCompanion(color: Value(color)));
+  }
+
+  /// Tombstone — silme diğer cihazlara senkronla yayılır.
+  Future<void> deleteEmployee(int id) => softDeleteRow(employees, id);
+
+  /// Yerel oturum temizliği (silinen çalışanın kendi cihazı) — senkrona
+  /// yayılmaması için kasıtlı hard delete; cihaz zaten ardından sıfırlanır.
+  Future<int> deleteEmployeeByEmail(String email) {
+    return (delete(employees)..where((t) => t.email.equals(email))).go();
   }
 }
 
@@ -136,7 +276,7 @@ extension EmployeeQueries on DatabaseService {
 extension AppointmentQueries on DatabaseService {
   Stream<List<Appointment>> watchAppointments(int businessId) {
     return (select(appointments)
-      ..where((t) => t.businessId.equals(businessId))
+      ..where((t) => t.businessId.equals(businessId) & t.deletedAt.isNull())
       ..orderBy([
         (t) => OrderingTerm(expression: t.date, mode: OrderingMode.asc),
         (t) => OrderingTerm(expression: t.time, mode: OrderingMode.asc),
@@ -159,7 +299,7 @@ extension AppointmentQueries on DatabaseService {
       LEFT JOIN customers c ON a.customer_id = c.id
       LEFT JOIN employees e ON a.employee_id = e.id
       LEFT JOIN services s ON a.service_id = s.id
-      WHERE a.business_id = ?
+      WHERE a.business_id = ? AND a.deleted_at IS NULL
       ORDER BY a.date ASC, a.time ASC
       ''',
       variables: [Variable(businessId)],
@@ -177,6 +317,7 @@ extension AppointmentQueries on DatabaseService {
       'serviceId': data['service_id'] as int?,
       'date': data['date'] as String,
       'time': data['time'] as String,
+      'endTime': data['end_time'] as String?,
       'price': (data['price'] as num?)?.toDouble(),
       'status': data['status'] as String,
       'note': data['note'] as String?,
@@ -203,7 +344,10 @@ extension AppointmentQueries on DatabaseService {
   Future<List<Appointment>> getAppointmentsByDate(int businessId, DateTime date) {
     final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     return (select(appointments)
-      ..where((t) => t.businessId.equals(businessId) & t.date.equals(dateStr))
+      ..where((t) =>
+          t.businessId.equals(businessId) &
+          t.date.equals(dateStr) &
+          t.deletedAt.isNull())
       ..orderBy([(t) => OrderingTerm(expression: t.time, mode: OrderingMode.asc)])
     ).get();
   }
@@ -226,10 +370,19 @@ extension FinanceQueries on DatabaseService {
   Future<int> addTransaction(TransactionsCompanion tx) =>
       into(transactions).insert(tx);
 
+  /// Hatalı girilen gelir/gider/tahsilat düzeltilir; appointmentId ve
+  /// customerId'ye dokunulmaz (ilişkili randevu/müşteri değişmez).
+  Future<int> updateTransaction(int id, TransactionsCompanion tx) {
+    return (update(transactions)..where((t) => t.id.equals(id))).write(tx);
+  }
+
+  /// Hatalı işlem kaydı silinir (tombstone — geçmiş senkronu bozmaz).
+  Future<void> deleteTransaction(int id) => softDeleteRow(transactions, id);
+
   Future<List<Transaction>> getTransactions(int businessId,
       {DateTime? start, DateTime? end}) {
     return (select(transactions)
-      ..where((t) => t.businessId.equals(businessId))
+      ..where((t) => t.businessId.equals(businessId) & t.deletedAt.isNull())
       ..orderBy([(t) => OrderingTerm(expression: t.date, mode: OrderingMode.desc)])
     ).get();
   }
@@ -250,6 +403,7 @@ extension FinanceQueries on DatabaseService {
       LEFT JOIN employees e ON e.id = a.employee_id
       LEFT JOIN customers c ON c.id = t.customer_id
       WHERE t.business_id = ? AND t.date >= ? AND t.date <= ?
+        AND t.deleted_at IS NULL
       ORDER BY t.date
       ''',
       variables: [Variable(businessId), Variable(startDate), Variable(endDate)],
@@ -274,7 +428,8 @@ extension FinanceQueries on DatabaseService {
       int businessId, String startDate, String endDate) {
     return customSelect(
       'SELECT status, COUNT(*) AS cnt FROM appointments '
-      'WHERE business_id = ? AND date >= ? AND date <= ? GROUP BY status',
+      'WHERE business_id = ? AND date >= ? AND date <= ? '
+      'AND deleted_at IS NULL GROUP BY status',
       variables: [Variable(businessId), Variable(startDate), Variable(endDate)],
       readsFrom: {appointments},
     ).get().then((rows) => {
@@ -289,7 +444,7 @@ extension FinanceQueries on DatabaseService {
     return customSelect(
       "SELECT employee_id, COUNT(*) AS cnt FROM appointments "
       "WHERE business_id = ? AND date >= ? AND date <= ? "
-      "AND status = 'completed' GROUP BY employee_id",
+      "AND status = 'completed' AND deleted_at IS NULL GROUP BY employee_id",
       variables: [Variable(businessId), Variable(startDate), Variable(endDate)],
       readsFrom: {appointments},
     ).get().then((rows) => {
@@ -303,7 +458,7 @@ extension FinanceQueries on DatabaseService {
   Future<double> getTotalIncome(int businessId, {required int year, required int month}) {
     return customSelect(
       "SELECT COALESCE(SUM(amount), 0) as total FROM transactions "
-      "WHERE business_id = ? AND type = 'income' "
+      "WHERE business_id = ? AND type = 'income' AND deleted_at IS NULL "
       "AND strftime('%Y', date) = ? AND strftime('%m', date) = ?",
       variables: [Variable(businessId), Variable('$year'), Variable(month.toString().padLeft(2, '0'))],
     ).getSingle().then((r) => (r.data['total'] as num).toDouble());
@@ -312,7 +467,7 @@ extension FinanceQueries on DatabaseService {
   Future<double> getTotalExpense(int businessId, {required int year, required int month}) {
     return customSelect(
       "SELECT COALESCE(SUM(amount), 0) as total FROM transactions "
-      "WHERE business_id = ? AND type = 'expense' "
+      "WHERE business_id = ? AND type = 'expense' AND deleted_at IS NULL "
       "AND strftime('%Y', date) = ? AND strftime('%m', date) = ?",
       variables: [Variable(businessId), Variable('$year'), Variable(month.toString().padLeft(2, '0'))],
     ).getSingle().then((r) => (r.data['total'] as num).toDouble());
@@ -325,10 +480,14 @@ extension CustomerQueries on DatabaseService {
       into(customers).insert(customer);
 
   Future<List<Customer>> getCustomers(int businessId) =>
-      (select(customers)..where((t) => t.businessId.equals(businessId))).get();
+      (select(customers)
+            ..where((t) => t.businessId.equals(businessId) & t.deletedAt.isNull()))
+          .get();
 
   Future<Customer?> getCustomerByPhone(String phone) =>
-      (select(customers)..where((t) => t.phone.equals(phone))).getSingleOrNull();
+      (select(customers)
+            ..where((t) => t.phone.equals(phone) & t.deletedAt.isNull()))
+          .getSingleOrNull();
 }
 
 // --- Service Queries ---
@@ -338,13 +497,16 @@ extension ServiceQueries on DatabaseService {
 
   Future<List<Service>> getServices(int businessId) =>
       (select(services)
-        ..where((t) => t.businessId.equals(businessId))
+        ..where((t) => t.businessId.equals(businessId) & t.deletedAt.isNull())
         ..orderBy([(t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc)])
       ).get();
 
   Future<List<Service>> getActiveServices(int businessId) =>
       (select(services)
-        ..where((t) => t.businessId.equals(businessId) & t.status.equals('active'))
+        ..where((t) =>
+            t.businessId.equals(businessId) &
+            t.status.equals('active') &
+            t.deletedAt.isNull())
         ..orderBy([(t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc)])
       ).get();
 
@@ -360,9 +522,8 @@ extension ServiceQueries on DatabaseService {
         .write(const ServicesCompanion(status: Value('inactive')));
   }
 
-  Future<int> deleteService(int id) {
-    return (delete(services)..where((t) => t.id.equals(id))).go();
-  }
+  /// Tombstone — silme diğer cihazlara senkronla yayılır.
+  Future<void> deleteService(int id) => softDeleteRow(services, id);
 
   /// Toplu zam. [isPercent] true ise yüzde, false ise sabit tutar eklenir.
   /// [serviceIds] boşsa işletmedeki tüm aktif hizmetlere uygulanır.
@@ -419,15 +580,16 @@ extension WorkingHoursQueries on DatabaseService {
 extension CategoryQueries on DatabaseService {
   Future<List<TransactionCategory>> getCategories(int businessId) =>
       (select(transactionCategories)
-        ..where((t) => t.businessId.equals(businessId))
+        ..where((t) => t.businessId.equals(businessId) & t.deletedAt.isNull())
         ..orderBy([(t) => OrderingTerm(expression: t.name)])
       ).get();
 
   Future<int> addCategory(TransactionCategoriesCompanion category) =>
       into(transactionCategories).insert(category);
 
-  Future<int> deleteCategory(int id) =>
-      (delete(transactionCategories)..where((t) => t.id.equals(id))).go();
+  /// Tombstone — silme diğer cihazlara senkronla yayılır.
+  Future<void> deleteCategory(int id) =>
+      softDeleteRow(transactionCategories, id);
 }
 
 // --- Debt Queries ---
@@ -435,13 +597,16 @@ extension DebtQueries on DatabaseService {
   Future<int> addDebt(DebtsCompanion debt) => into(debts).insert(debt);
 
   Future<List<Debt>> getCustomerDebts(int customerId) =>
-      (select(debts)..where((t) => t.customerId.equals(customerId))).get();
+      (select(debts)
+            ..where((t) => t.customerId.equals(customerId) & t.deletedAt.isNull()))
+          .get();
 
   Future<List<Debt>> getPendingDebts(int businessId) =>
       (select(debts)
         ..where((t) =>
             t.businessId.equals(businessId) &
-            t.status.isIn(['pending', 'partial']))
+            t.status.isIn(['pending', 'partial']) &
+            t.deletedAt.isNull())
       ).get();
 
   /// Müşterinin açık borçları, en eskisi önce (tahsilat bu sırayla düşülür).
@@ -450,7 +615,8 @@ extension DebtQueries on DatabaseService {
         ..where((t) =>
             t.businessId.equals(businessId) &
             t.customerId.equals(customerId) &
-            t.status.isIn(['pending', 'partial']))
+            t.status.isIn(['pending', 'partial']) &
+            t.deletedAt.isNull())
         ..orderBy([(t) => OrderingTerm(expression: t.createdAt)])
       ).get();
 
@@ -473,6 +639,7 @@ extension DebtQueries on DatabaseService {
       LEFT JOIN employees e ON e.id = a.employee_id
       JOIN customers c ON c.id = d.customer_id
       WHERE d.business_id = ? AND d.status IN ('pending', 'partial')
+        AND d.deleted_at IS NULL
       GROUP BY a.employee_id, c.id
       HAVING SUM(d.amount - d.paid_amount) > 0.009
       ORDER BY remaining DESC
@@ -502,6 +669,7 @@ extension DebtQueries on DatabaseService {
       FROM debts d
       JOIN customers c ON c.id = d.customer_id
       WHERE d.business_id = ? AND d.status IN ('pending', 'partial')
+        AND d.deleted_at IS NULL
       GROUP BY c.id, c.name, c.phone
       HAVING SUM(d.amount - d.paid_amount) > 0.009
       ORDER BY remaining DESC
@@ -518,5 +686,225 @@ extension DebtQueries on DatabaseService {
               'oldestDebtAt': r.data['oldest_debt_at'] as String?,
             })
         .toList());
+  }
+}
+
+// --- Sync Queries (DataSyncService tarafından kullanılır) ---
+extension SyncQueries on DatabaseService {
+  /// Push bekleyen satırlar: hiç senkronlanmamış veya son senkron sonrası
+  /// değişmiş. UTC ISO string karşılaştırması kronolojiktir.
+  Future<List<Map<String, dynamic>>> getDirtyRows(
+      TableInfo<Table, dynamic> table, int businessId) async {
+    final t = table.actualTableName;
+    final rows = await customSelect(
+      'SELECT * FROM $t WHERE business_id = ? AND row_uid IS NOT NULL '
+      'AND sync_updated_at IS NOT NULL '
+      'AND (last_synced_at IS NULL OR sync_updated_at > last_synced_at)',
+      variables: [Variable(businessId)],
+    ).get();
+    return rows.map((r) => Map<String, dynamic>.of(r.data)).toList();
+  }
+
+  /// Başarılı push sonrası işaretle. Yalnızca last_synced_at değiştiği için
+  /// sync trigger'ı tetiklenmez; push ile mark arasında satır değiştiyse
+  /// sync_updated_at ileride kalır ve satır kirli kalmaya devam eder.
+  Future<void> markRowSynced(
+      TableInfo<Table, dynamic> table, int id, String syncUpdatedAt) {
+    return customStatement(
+      'UPDATE ${table.actualTableName} SET last_synced_at = ? WHERE id = ?',
+      [syncUpdatedAt, id],
+    );
+  }
+
+  Future<Map<String, dynamic>?> getRowByUid(
+      TableInfo<Table, dynamic> table, String rowUid) async {
+    final rows = await customSelect(
+      'SELECT * FROM ${table.actualTableName} WHERE row_uid = ? LIMIT 1',
+      variables: [Variable(rowUid)],
+    ).get();
+    return rows.isEmpty ? null : Map<String, dynamic>.of(rows.first.data);
+  }
+
+  Future<String?> rowUidForId(TableInfo<Table, dynamic> table, int id) async {
+    final rows = await customSelect(
+      'SELECT row_uid FROM ${table.actualTableName} WHERE id = ? LIMIT 1',
+      variables: [Variable(id)],
+    ).get();
+    return rows.isEmpty ? null : rows.first.data['row_uid'] as String?;
+  }
+
+  Future<int?> localIdForUid(
+      TableInfo<Table, dynamic> table, String rowUid) async {
+    final rows = await customSelect(
+      'SELECT id FROM ${table.actualTableName} WHERE row_uid = ? LIMIT 1',
+      variables: [Variable(rowUid)],
+    ).get();
+    return rows.isEmpty ? null : rows.first.data['id'] as int?;
+  }
+
+  /// Tombstone: satırı fiziksel silmek yerine deleted_at doldurulur;
+  /// trigger sync_updated_at'i bumplar, tombstone diğer cihazlara yayılır.
+  Future<void> softDeleteRow(TableInfo<Table, dynamic> table, int id) {
+    return customStatement(
+      'UPDATE ${table.actualTableName} '
+      "SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
+      [id],
+    );
+  }
+
+  /// Pull-apply: kolon haritasıyla insert/update. sync_updated_at ve
+  /// last_synced_at birlikte remote değere çekilir — trigger tetiklenmez,
+  /// satır "temiz" durur.
+  Future<void> applyRemoteRow(
+    TableInfo<Table, dynamic> table, {
+    required Map<String, dynamic> columns,
+    int? existingLocalId,
+  }) async {
+    final t = table.actualTableName;
+    if (existingLocalId == null) {
+      final cols = columns.keys.toList();
+      final placeholders = List.filled(cols.length, '?').join(',');
+      await customStatement(
+        'INSERT INTO $t (${cols.join(',')}) VALUES ($placeholders)',
+        [for (final c in cols) columns[c]],
+      );
+    } else {
+      final cols = columns.keys.where((c) => c != 'id').toList();
+      final setClause = cols.map((c) => '$c = ?').join(', ');
+      await customStatement(
+        'UPDATE $t SET $setClause WHERE id = ?',
+        [for (final c in cols) columns[c], existingLocalId],
+      );
+    }
+  }
+
+  /// İki cihaz bağımsız push yaptığında oluşan duplike satırları temizler.
+  /// Her dedup grubunda en yeni `sync_updated_at`'e sahip satır korunur,
+  /// diğerleri tombstone yapılır. Idempotent — tekrar çağrılsa zarar vermez.
+  Future<int> cleanupDuplicateRows() async {
+    var removed = 0;
+    // employees → email, customers → phone, services → name, kategoriler → ad
+    const dedupes = {
+      'employees': 'email',
+      'customers': 'phone',
+      'services': 'name',
+      'transaction_categories': 'name',
+    };
+    for (final entry in dedupes.entries) {
+      final t = entry.key;
+      final col = entry.value;
+      final dups = await customSelect(
+        'SELECT $col, COUNT(*) as cnt FROM $t '
+        'WHERE deleted_at IS NULL GROUP BY $col HAVING cnt > 1',
+      ).get();
+      for (final row in dups) {
+        final val = row.data[col];
+        if (val == null) continue;
+        // En yeni sync_updated_at'e sahip satırı bul, diğerlerini tombstone
+        final ids = await customSelect(
+          'SELECT id FROM $t WHERE $col = ? AND deleted_at IS NULL '
+          'ORDER BY sync_updated_at DESC',
+          variables: [Variable(val)],
+        ).get();
+        if (ids.length < 2) continue;
+        final keeper = ids.first.data['id'] as int;
+        for (final dup in ids.skip(1)) {
+          final dupId = dup.data['id'] as int;
+          await softDeleteRow(
+            _tableByName(t),
+            dupId,
+          );
+          removed++;
+        }
+        // Keep duplicates' rowUids point to keeper (future syncs merge cleanly)
+        if (ids.length > 1) {
+          final keeperUid = (await customSelect(
+            'SELECT row_uid FROM $t WHERE id = ?',
+            variables: [Variable(keeper)],
+          ).get()).first.data['row_uid'] as String?;
+          if (keeperUid != null) {
+            for (final dup in ids.skip(1)) {
+              await customStatement(
+                'UPDATE $t SET row_uid = ? WHERE id = ?',
+                [keeperUid, dup.data['id']],
+              );
+            }
+          }
+        }
+      }
+    }
+    return removed;
+  }
+
+  TableInfo<Table, dynamic> _tableByName(String name) {
+    for (final t in syncedTables) {
+      if (t.actualTableName == name) return t;
+    }
+    throw ArgumentError('Unknown synced table: $name');
+  }
+}
+
+// --- Employee Permission Queries ---
+extension EmployeePermissionQueries on DatabaseService {
+  Future<EmployeePermission?> getEmployeePermissions(int employeeId) async {
+    // limit(1): olası eski duplike satırlarda getSingleOrNull patlamasın
+    final rows = await (select(employeePermissions)
+          ..where((t) => t.employeeId.equals(employeeId))
+          ..limit(1))
+        .get();
+    return rows.isNotEmpty ? rows.first : null;
+  }
+
+  /// employeeId'ye göre upsert — PK'ya göre değil. Aynı çalışana ikinci
+  /// satır açılmasını engeller.
+  Future<void> saveEmployeePermissions(EmployeePermissionsCompanion perm) async {
+    final employeeId = perm.employeeId.value;
+    final existing = await getEmployeePermissions(employeeId);
+    if (existing == null) {
+      await into(employeePermissions).insert(perm);
+    } else {
+      await (update(employeePermissions)
+            ..where((t) => t.id.equals(existing.id)))
+          .write(perm);
+    }
+  }
+
+  /// Firestore'dan gelen izin haritasını yerel tabloya yazar (çalışan cihazı
+  /// çevrimdışıyken son bilinen değerleri kullanabilsin).
+  Future<void> cacheEmployeePermissions(
+      int employeeId, int businessId, Map<String, dynamic> perms) async {
+    final now = DateTime.now().toIso8601String();
+    final existing = await getEmployeePermissions(employeeId);
+    await saveEmployeePermissions(EmployeePermissionsCompanion(
+      employeeId: Value(employeeId),
+      businessId: Value(businessId),
+      canSendWhatsapp:
+          Value(perms['canSendWhatsapp'] as bool? ?? true),
+      canBulkWhatsapp:
+          Value(perms['canBulkWhatsapp'] as bool? ?? true),
+      canViewFinance: Value(perms['canViewFinance'] as bool? ?? true),
+      canManageServices:
+          Value(perms['canManageServices'] as bool? ?? false),
+      canManageEmployees:
+          Value(perms['canManageEmployees'] as bool? ?? false),
+      createdAt: Value(existing?.createdAt ?? now),
+      updatedAt: Value(now),
+    ));
+  }
+
+  Future<List<EmployeePermission>> getBusinessPermissions(int businessId) =>
+      (select(employeePermissions)..where((t) => t.businessId.equals(businessId)))
+          .get();
+
+  Future<void> ensureEmployeePermission(int employeeId, int businessId) async {
+    final existing = await getEmployeePermissions(employeeId);
+    if (existing == null) {
+      await saveEmployeePermissions(EmployeePermissionsCompanion.insert(
+        employeeId: employeeId,
+        businessId: businessId,
+        createdAt: DateTime.now().toIso8601String(),
+        updatedAt: DateTime.now().toIso8601String(),
+      ));
+    }
   }
 }

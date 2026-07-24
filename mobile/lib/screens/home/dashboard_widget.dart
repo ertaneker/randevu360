@@ -12,7 +12,9 @@ import '../whatsapp/bulk_message_screen.dart';
 import '../customer/add_customer_screen.dart';
 
 class DashboardWidget extends StatefulWidget {
-  const DashboardWidget({super.key});
+  final VoidCallback? onMenu;
+
+  const DashboardWidget({super.key, this.onMenu});
 
   @override
   State<DashboardWidget> createState() => _DashboardWidgetState();
@@ -43,7 +45,11 @@ class _DashboardWidgetState extends State<DashboardWidget> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Randevu 360'),
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: widget.onMenu,
+        ),
+        title: const Text('Ana Sayfa'),
         actions: [
           if (isAdmin)
             IconButton(
@@ -229,11 +235,6 @@ class _WelcomeCard extends StatelessWidget {
           Text(
             context.l10n.greetingHello(auth.user?.displayName ?? ''),
             style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            context.l10n.greetingSubtitle,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
           ),
         ],
       ),

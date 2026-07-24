@@ -28,7 +28,7 @@ class NotificationService {
 
     // WhatsApp service channel (foreground service bildirimi)
     const whatsappChannel = AndroidNotificationChannel(
-      'randevu360_whatsapp',
+      'esnaftakvim_whatsapp',
       'WhatsApp Servisi',
       description: 'WhatsApp bağlantı durumu bildirimleri',
       importance: Importance.low,
@@ -42,7 +42,7 @@ class NotificationService {
 
     // Appointment reminders channel
     const reminderChannel = AndroidNotificationChannel(
-      'randevu360_reminders',
+      'esnaftakvim_reminders',
       'Randevu Hatırlatmaları',
       description: 'Randevu hatırlatma bildirimleri',
       importance: Importance.high,
@@ -84,7 +84,7 @@ class NotificationService {
       body,
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'randevu360_whatsapp',
+          'esnaftakvim_whatsapp',
           'WhatsApp Servisi',
           importance: Importance.low,
           priority: Priority.low,
@@ -106,7 +106,7 @@ class NotificationService {
       body,
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'randevu360_reminders',
+          'esnaftakvim_reminders',
           'Randevu Hatırlatmaları',
           importance: Importance.high,
           priority: Priority.high,
@@ -136,7 +136,7 @@ class NotificationService {
     if (notification != null) {
       showReminderNotification(
         id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        title: notification.title ?? 'Randevu 360',
+        title: notification.title ?? 'Esnaf Takvim',
         body: notification.body ?? '',
         payload: message.data.toString(),
       );

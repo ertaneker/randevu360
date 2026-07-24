@@ -5,8 +5,27 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../database/database_service.dart';
+
+/// Açılıştaki Drive yedek kontrolünün sonucu.
+enum DriveSyncResult {
+  /// Uzakta daha yeni yedek vardı, indirildi — uygulama yeniden başlatılmalı.
+  restored,
+
+  /// Uzak yedek bu cihazın bildiği sürümle aynı.
+  upToDate,
+
+  /// Drive'da hiç yedek yok.
+  noBackup,
+
+  /// Sessiz Google girişi yapılamadı (izin yok / çevrimdışı) — kontrol atlandı.
+  skipped,
+
+  /// İndirme/sorgu hatası (detay [BackupService.lastError]).
+  error,
+}
 
 /// Google Drive yedekleme servisi
 /// SQLite veritabanını Google Drive'a yedekler ve geri yükler.
@@ -16,8 +35,13 @@ import '../database/database_service.dart';
 /// açmadan önce bu dosyayı devreye alır (açık bir SQLite dosyasının üzerine
 /// yazmak güvenli değildir).
 class BackupService {
-  static const String _backupFileName = 'randevu360_backup.db';
+  static const String _backupFileName = 'esnaftakvim_backup.db';
   static const String restorePendingFileName = 'restore_pending.db';
+
+  /// Bu cihazın bildiği son Drive yedeğinin modifiedTime değeri.
+  /// Açılışta uzak değerle karşılaştırılır; farklıysa başka bir cihaz
+  /// yedek yüklemiş demektir ve yedek indirilir.
+  static const String _markerPrefKey = 'drive_backup_marker';
   static const String _mimeType = 'application/octet-stream';
   static const List<String> _scopes = [
     'https://www.googleapis.com/auth/drive.file',
@@ -52,10 +76,63 @@ class BackupService {
     }
   }
 
+  /// Ekran göstermeden giriş dener — açılış kontrolü için. Hesap yoksa veya
+  /// Drive izni hiç verilmemişse false döner; kullanıcı akışı bölünmez.
+  Future<bool> authenticateSilently() async {
+    try {
+      _account = await _googleSignIn.signInSilently();
+      return _account != null;
+    } catch (e) {
+      lastError = e.toString();
+      return false;
+    }
+  }
+
   Future<String?> _getAccessToken() async {
     if (_account == null) return null;
     final auth = await _account!.authentication;
     return auth.accessToken;
+  }
+
+  Future<void> _saveMarker(String modifiedTime) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_markerPrefKey, modifiedTime);
+  }
+
+  /// Açılışta çağrılır: Drive'daki yedek bu cihazın bilmediği bir sürümse
+  /// indirir (restore_pending.db). [localHasData] false ise (taze kurulum)
+  /// ilk bulunan yedek doğrudan indirilir; true ise ilk karşılaştırmada
+  /// yereldeki taze veri korunur ve uzak sürüm benimsenir.
+  Future<DriveSyncResult> syncFromDriveIfNewer(
+      {required bool localHasData}) async {
+    try {
+      if (!await authenticateSilently()) return DriveSyncResult.skipped;
+      final token = await _getAccessToken();
+      if (token == null) return DriveSyncResult.skipped;
+
+      final files = await _searchBackups(token);
+      if (files.isEmpty) return DriveSyncResult.noBackup;
+      final remoteModified = files[0]['modifiedTime'].toString();
+
+      final prefs = await SharedPreferences.getInstance();
+      final marker = prefs.getString(_markerPrefKey);
+
+      if (marker == remoteModified) return DriveSyncResult.upToDate;
+
+      if (marker == null && localHasData) {
+        // Bu cihaz yedeği hiç görmemiş ama yerelde veri var — üzerine yazmak
+        // taze veriyi kaybettirir. Uzak sürümü benimse, bundan sonra fark
+        // oluşursa indirilecek.
+        await _saveMarker(remoteModified);
+        return DriveSyncResult.upToDate;
+      }
+
+      final ok = await restore();
+      return ok ? DriveSyncResult.restored : DriveSyncResult.error;
+    } catch (e) {
+      lastError = e.toString();
+      return DriveSyncResult.error;
+    }
   }
 
   /// Yedekleme yap
@@ -83,7 +160,7 @@ class BackupService {
         // Mevcut yedeğin içeriğini güncelle (dosya çoğalmasın)
         response = await http.patch(
           Uri.parse(
-            'https://www.googleapis.com/upload/drive/v3/files/$existingId?uploadType=media',
+            'https://www.googleapis.com/upload/drive/v3/files/$existingId?uploadType=media&fields=modifiedTime',
           ),
           headers: {
             'Authorization': 'Bearer $token',
@@ -108,7 +185,7 @@ class BackupService {
 
         response = await http.post(
           Uri.parse(
-            'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+            'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=modifiedTime',
           ),
           headers: {
             'Authorization': 'Bearer $token',
@@ -122,6 +199,14 @@ class BackupService {
         lastError = _describeDriveError('yükleme', response);
         return false;
       }
+
+      // Yüklenen sürümü "bilinen sürüm" olarak işaretle — açılış kontrolü
+      // kendi yüklediğimiz yedeği yeniden indirmesin.
+      try {
+        final modified =
+            jsonDecode(response.body)['modifiedTime']?.toString();
+        if (modified != null) await _saveMarker(modified);
+      } catch (_) {}
       return true;
     } catch (e) {
       lastError = e.toString();
@@ -140,11 +225,12 @@ class BackupService {
         return false;
       }
 
-      final fileId = await _findNewestBackupId(token);
-      if (fileId == null) {
+      final files = await _searchBackups(token);
+      if (files.isEmpty) {
         lastError = 'Drive üzerinde yedek bulunamadı';
         return false;
       }
+      final fileId = files[0]['id'] as String;
 
       final downloadResponse = await http.get(
         Uri.parse('https://www.googleapis.com/drive/v3/files/$fileId?alt=media'),
@@ -159,6 +245,10 @@ class BackupService {
       final dir = await getApplicationDocumentsDirectory();
       final pending = File(p.join(dir.path, restorePendingFileName));
       await pending.writeAsBytes(downloadResponse.bodyBytes, flush: true);
+
+      // İndirilen sürümü işaretle — açılış kontrolü aynı yedeği tekrar
+      // indirip yeniden başlatma döngüsüne girmesin.
+      await _saveMarker(files[0]['modifiedTime'].toString());
 
       return true;
     } catch (e) {

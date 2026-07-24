@@ -13,6 +13,19 @@ class AppTheme {
   static const Color textPrimary = Color(0xFF212121);
   static const Color textSecondary = Color(0xFF757575);
 
+  /// Parse hex color string (e.g. '#6C63FF' or '6C63FF') to Color.
+  static Color parseHex(String hex) {
+    hex = hex.replaceFirst('#', '');
+    if (hex.length == 6) hex = 'FF$hex';
+    return Color(int.parse(hex, radix: 16));
+  }
+
+  /// Çalışan renk paleti — grid ve takvimde kullanılır.
+  static const List<String> employeeColorPalette = [
+    '#6C63FF', '#FF6584', '#4CAF50', '#FFC107', '#2196F3',
+    '#FF5722', '#9C27B0', '#00BCD4', '#795548', '#607D8B',
+  ];
+
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,

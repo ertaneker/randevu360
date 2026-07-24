@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import '../core/database/database_service.dart';
+import '../services/data_sync_service.dart';
 
 class CustomerProvider extends ChangeNotifier {
   DatabaseService? _db;
@@ -65,6 +66,7 @@ class CustomerProvider extends ChangeNotifier {
 
       // Reload to refresh customer list
       await loadCustomers(data['businessId']);
+      DataSyncService.instance.nudge();
       return true;
     } catch (e) {
       _error = e.toString();

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import '../core/database/database_service.dart';
+import '../services/data_sync_service.dart';
 
 class FinanceProvider extends ChangeNotifier {
   DatabaseService? _db;
@@ -87,6 +88,44 @@ class FinanceProvider extends ChangeNotifier {
 
       // Reload to refresh transaction list and totals
       await loadTransactions(data['businessId']);
+      DataSyncService.instance.nudge();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Hatalı girilen tutar/kategori/açıklama vb. düzeltilir.
+  Future<bool> updateTransaction(int id, Map<String, dynamic> data) async {
+    try {
+      final db = _db!;
+      await db.updateTransaction(id, TransactionsCompanion(
+        type: Value(data['type']),
+        amount: Value(data['amount']),
+        category: Value(data['category']),
+        description: Value(data['description'] ?? ''),
+        paymentMethod: Value(data['paymentMethod'] ?? 'cash'),
+        date: Value(data['date']),
+      ));
+
+      await loadTransactions(data['businessId']);
+      DataSyncService.instance.nudge();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Hatalı girilen işlem tamamen silinir.
+  Future<bool> deleteTransaction(int id, int businessId) async {
+    try {
+      await _db!.deleteTransaction(id);
+      await loadTransactions(businessId);
+      DataSyncService.instance.nudge();
       return true;
     } catch (e) {
       _error = e.toString();
@@ -154,6 +193,7 @@ class FinanceProvider extends ChangeNotifier {
       ));
       await loadDebtors(businessId);
       await loadDebts(businessId);
+      DataSyncService.instance.nudge();
       return true;
     } catch (e) {
       _error = e.toString();
@@ -212,6 +252,7 @@ class FinanceProvider extends ChangeNotifier {
       await loadDebtors(businessId);
       await loadDebts(businessId);
       await loadTransactions(businessId);
+      DataSyncService.instance.nudge();
       return true;
     } catch (e) {
       _error = e.toString();
@@ -236,6 +277,7 @@ class FinanceProvider extends ChangeNotifier {
   List<String> categoryNames(String type) => _categories
       .where((c) => c['type'] == type)
       .map((c) => c['name'] as String)
+      .toSet()
       .toList();
 
   /// Kategorileri yükler; işletme için hiç kategori yoksa varsayılanları

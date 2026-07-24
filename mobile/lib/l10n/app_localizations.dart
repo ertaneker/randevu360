@@ -117,7 +117,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'Randevu 360'**
+  /// **'Esnaf Takvim'**
   String get appTitle;
 
   /// No description provided for @save.
@@ -1587,7 +1587,7 @@ abstract class AppLocalizations {
   /// No description provided for @businessSetupSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Set up your business to start using Randevu 360'**
+  /// **'Set up your business to start using Esnaf Takvim'**
   String get businessSetupSubtitle;
 
   /// No description provided for @businessNameField.
@@ -1997,6 +1997,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'System default'**
   String get languageSystemDefault;
+
+  /// No description provided for @gridView.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid View'**
+  String get gridView;
+
+  /// No description provided for @listView.
+  ///
+  /// In en, this message translates to:
+  /// **'List View'**
+  String get listView;
+
+  /// No description provided for @scheduleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule'**
+  String get scheduleTitle;
+
+  /// No description provided for @tapToAddAppointment.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to add appointment'**
+  String get tapToAddAppointment;
+
+  /// No description provided for @employeeColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee color'**
+  String get employeeColor;
+
+  /// No description provided for @gridDisplayHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid display hours'**
+  String get gridDisplayHours;
+
+  /// No description provided for @gridStartHour.
+  ///
+  /// In en, this message translates to:
+  /// **'Start hour'**
+  String get gridStartHour;
+
+  /// No description provided for @gridEndHour.
+  ///
+  /// In en, this message translates to:
+  /// **'End hour'**
+  String get gridEndHour;
+
+  /// No description provided for @gridSettingsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid settings saved'**
+  String get gridSettingsSaved;
+
+  /// No description provided for @changeColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Color'**
+  String get changeColor;
+
+  /// No description provided for @selectColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Color'**
+  String get selectColor;
 }
 
 class _AppLocalizationsDelegate

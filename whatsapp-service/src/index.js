@@ -10,6 +10,7 @@ const clientManager = require('./client');
 const AppointmentScheduler = require('./scheduler');
 const apiRouter = require('./api');
 const db = require('./db');
+const pgdb = require('./pgdb');
 const logger = require('./logger');
 
 const PORT = process.env.PORT || 3000;
@@ -53,6 +54,7 @@ process.on('SIGINT', async () => {
 
 async function start() {
   await db.initDatabase();
+  await pgdb.initPgDatabase();
 
   scheduler.startPolling();
 
@@ -64,7 +66,7 @@ async function start() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    logger.info(`Randevu360 WhatsApp servisi başladı :${PORT}`);
+    logger.info(`Esnaf Takvim WhatsApp servisi başladı :${PORT}`);
   });
 }
 

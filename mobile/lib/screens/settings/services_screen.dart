@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/business_provider.dart';
 import '../../providers/service_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../services/permission_service.dart';
 
 class ServicesScreen extends StatefulWidget {
   const ServicesScreen({super.key});
@@ -13,11 +14,24 @@ class ServicesScreen extends StatefulWidget {
 
 class _ServicesScreenState extends State<ServicesScreen> {
   final _searchController = TextEditingController();
+  bool _hasPermission = true;
+  bool _permissionLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkPermission());
+  }
+
+  Future<void> _checkPermission() async {
+    final allowed = await PermissionService.can(
+        context, EmployeePermissionKey.manageServices);
+    if (!mounted) return;
+    setState(() {
+      _hasPermission = allowed;
+      _permissionLoaded = true;
+    });
+    if (allowed) _loadData();
   }
 
   @override
@@ -39,6 +53,30 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_permissionLoaded) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Hizmetler')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (!_hasPermission) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Hizmetler')),
+        body: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.lock_outline, size: 48, color: AppTheme.textSecondary),
+              SizedBox(height: 16),
+              Text(
+                'Hizmetleri yönetme yetkiniz yok.',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Hizmetler'),

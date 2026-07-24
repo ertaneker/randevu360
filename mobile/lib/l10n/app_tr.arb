@@ -1,6 +1,6 @@
 {
   "@@locale": "tr",
-  "appTitle": "Randevu 360",
+  "appTitle": "Esnaf Takvim",
   "save": "Kaydet",
   "cancel": "İptal",
   "delete": "Sil",
@@ -261,7 +261,7 @@
 
   "defineBusiness": "İşletmeni Tanımla",
   "businessInfoTitle": "İşletme Bilgileri",
-  "businessSetupSubtitle": "Randevu 360'ı kullanmak için işletmenizi tanımlayın",
+  "businessSetupSubtitle": "Esnaf Takvim'i kullanmak için işletmenizi tanımlayın",
   "businessNameField": "İşletme Adı",
   "businessNameRequired": "İşletme adı gerekli",
   "addressField": "Adres",

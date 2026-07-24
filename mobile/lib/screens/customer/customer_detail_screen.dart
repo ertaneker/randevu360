@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../providers/business_provider.dart';
+import '../../providers/finance_provider.dart';
 import '../../providers/whatsapp_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../services/permission_service.dart';
+import '../../services/whatsapp_session.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
   final Map<String, dynamic> customer;
@@ -18,6 +21,22 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   final _messageController = TextEditingController();
   bool _isSending = false;
   bool _showMessageInput = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadDebt());
+  }
+
+  /// Borç, Customers.totalDebt kolonundan değil (asla güncellenmiyor,
+  /// hep 0) Debts tablosundan canlı hesaplanır — liste ekranındaki
+  /// borç rozetiyle aynı kaynak.
+  void _loadDebt() {
+    final businessId = context.read<BusinessProvider>().business?['id'];
+    if (businessId is int) {
+      context.read<FinanceProvider>().loadDebtors(businessId);
+    }
+  }
 
   @override
   void dispose() {
@@ -65,9 +84,23 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       return;
     }
 
+    if (!await PermissionService.can(
+        context, EmployeePermissionKey.sendWhatsapp)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('WhatsApp mesajı gönderme yetkiniz yok.'),
+          backgroundColor: AppTheme.warning,
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+
     setState(() => _isSending = true);
 
-    final businessId = context.read<BusinessProvider>().business?['id']?.toString() ?? 'unknown';
+    final businessId = await resolveWhatsAppSessionKey(context);
+    if (!mounted) return;
     final waProvider = context.read<WhatsAppProvider>();
 
     final customerName = widget.customer['name']?.toString() ?? 'Musteri';
@@ -102,7 +135,11 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     final phone = c['phone']?.toString() ?? '-';
     final email = c['email']?.toString() ?? '';
     final note = c['note']?.toString() ?? '';
-    final totalDebt = c['totalDebt'] ?? 0;
+    final debtors = context.watch<FinanceProvider>().debtors;
+    final debtRow = debtors.cast<Map<String, dynamic>?>().firstWhere(
+        (d) => d?['customerId'] == c['id'],
+        orElse: () => null);
+    final totalDebt = (debtRow?['remaining'] as double?) ?? 0;
     final source = c['source']?.toString() ?? 'manual';
 
     return Scaffold(
@@ -164,8 +201,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
           _InfoCard(
             icon: Icons.money,
             label: 'Toplam Borc',
-            value: '$totalDebt TL',
-            valueColor: (totalDebt is num && totalDebt > 0) ? AppTheme.error : AppTheme.textPrimary,
+            value: '${totalDebt.toStringAsFixed(0)} TL',
+            valueColor: totalDebt > 0 ? AppTheme.error : AppTheme.textPrimary,
           ),
           if (note.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -237,7 +274,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
               children: [
                 _TemplateChip('Hatirlatma', 'Merhaba {first_name}, randevunuzu unutmayin!',
                     onSelect: (msg) => _messageController.text = msg),
-                _TemplateChip('Borc', 'Merhaba {first_name}, $totalDebt TL borcunuz bulunmaktadir.',
+                _TemplateChip('Borc', 'Merhaba {first_name}, ${totalDebt.toStringAsFixed(0)} TL borcunuz bulunmaktadir.',
                     onSelect: (msg) => _messageController.text = msg),
                 _TemplateChip('Tesekkur', 'Merhaba {first_name}, ziyaretiniz icin tesekkur ederiz!',
                     onSelect: (msg) => _messageController.text = msg),

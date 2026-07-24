@@ -11,11 +11,17 @@ import '../../providers/whatsapp_provider.dart';
 import '../../core/l10n/l10n_ext.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/debt_sync.dart';
+import '../../services/whatsapp_session.dart';
 import 'new_appointment_screen.dart';
 import 'payment_dialog.dart';
+import 'staff_schedule_grid_screen.dart';
+
+enum _ViewMode { list, grid }
 
 class AppointmentScreen extends StatefulWidget {
-  const AppointmentScreen({super.key});
+  final VoidCallback? onMenu;
+
+  const AppointmentScreen({super.key, this.onMenu});
 
   @override
   State<AppointmentScreen> createState() => _AppointmentScreenState();
@@ -23,6 +29,7 @@ class AppointmentScreen extends StatefulWidget {
 
 class _AppointmentScreenState extends State<AppointmentScreen> {
   CalendarFormat _format = CalendarFormat.month;
+  _ViewMode _viewMode = _ViewMode.list;
 
   @override
   void initState() {
@@ -84,8 +91,19 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: widget.onMenu,
+        ),
         title: Text(context.l10n.appointmentsTitle),
         actions: [
+          IconButton(
+            icon: Icon(_viewMode == _ViewMode.list ? Icons.calendar_view_week : Icons.view_list),
+            tooltip: _viewMode == _ViewMode.list ? 'Grid Görünüm' : 'Liste Görünüm',
+            onPressed: () => setState(() {
+              _viewMode = _viewMode == _ViewMode.list ? _ViewMode.grid : _ViewMode.list;
+            }),
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NewAppointmentScreen())),
@@ -94,6 +112,13 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
       ),
       body: Consumer<AppointmentProvider>(
         builder: (context, provider, _) {
+          if (_viewMode == _ViewMode.grid) {
+            return StaffScheduleGrid(
+              selectedDate: provider.selectedDate,
+              onDateChanged: (date) => provider.setSelectedDate(date),
+              onAppointmentTap: (apt) => _showAppointmentDetail(context, apt),
+            );
+          }
           return Column(
             children: [
               // Calendar
@@ -268,6 +293,15 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                   ),
                 ],
               )
+            else if (apt['status'] == 'cancelled')
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _restoreAppointment(context, apt),
+                  icon: const Icon(Icons.settings_backup_restore),
+                  label: const Text('İptali Düzelt (Geri Al)'),
+                ),
+              )
             else
               Row(
                 children: [
@@ -310,6 +344,27 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(ok ? context.l10n.appointmentCancelled : context.l10n.appointmentCancelFailed),
+        backgroundColor: ok ? AppTheme.success : AppTheme.error,
+      ),
+    );
+  }
+
+  /// Hatalı iptal düzeltilir: randevu tekrar onaylanır (hatırlatmalar geri
+  /// döner) ve müşteriye "iptal hatalıydı, düzeltildi" mesajı gider.
+  Future<void> _restoreAppointment(
+    BuildContext sheetContext,
+    Map<String, dynamic> apt,
+  ) async {
+    Navigator.pop(sheetContext);
+
+    final ok = await context.read<AppointmentProvider>().updateStatus(apt['id'] as int, 'confirmed');
+    if (!mounted) return;
+
+    unawaited(_notifyCorrection(apt));
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'İptal düzeltildi, randevu tekrar onaylandı' : 'Düzeltme başarısız'),
         backgroundColor: ok ? AppTheme.success : AppTheme.error,
       ),
     );
@@ -418,20 +473,7 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
     final businessName = business['name']?.toString() ?? '';
     final price = (apt['price'] as double?) ?? 0;
 
-    await whatsapp.syncAppointments([
-      {
-        'businessId': businessKey,
-        'appointmentId': apt['id'].toString(),
-        'customerName': apt['customerName'] ?? '',
-        'customerPhone': phone,
-        'businessName': businessName,
-        'serviceName': apt['serviceName'] ?? '',
-        'date': apt['date'],
-        'time': apt['time'],
-        'price': price,
-        'status': status,
-      }
-    ]);
+    await _syncAppointmentToServer(whatsapp, business, apt, status);
 
     await whatsapp.sendTemplate(businessKey, phone, templateName, {
       'musteri': apt['customerName']?.toString() ?? '',
@@ -441,6 +483,54 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
       'hizmet': apt['serviceName']?.toString() ?? '',
       'tutar': price.toStringAsFixed(0),
     });
+  }
+
+  /// Yanlış yapılan iptal geri alındığında sunucudaki kayıt "confirmed"a
+  /// döner (hatırlatmalar tekrar planlanır) ve müşteriye düzeltme mesajı
+  /// gider. Şablon sistemine bağlı olmadığı için sunucu değişikliği gerekmez.
+  Future<void> _notifyCorrection(Map<String, dynamic> apt) async {
+    final business = context.read<BusinessProvider>().business;
+    if (business == null) return;
+
+    final phone = apt['customerPhone']?.toString() ?? '';
+    if (phone.isEmpty) return;
+
+    final whatsapp = context.read<WhatsAppProvider>();
+    await _syncAppointmentToServer(whatsapp, business, apt, 'confirmed');
+
+    final businessName = business['name']?.toString() ?? '';
+    final customerName = apt['customerName']?.toString() ?? '';
+    final message = 'Merhaba $customerName, ${apt['date'] ?? ''} ${apt['time'] ?? ''} '
+        'tarihindeki ${apt['serviceName'] ?? ''} randevunuzun iptali hatalı yapılmıştı. '
+        'Bu düzeltildi, randevunuz tekrar onaylanmıştır. - $businessName';
+
+    if (!mounted) return;
+    final sessionKey = await resolveWhatsAppSessionKey(context);
+    if (!mounted) return;
+    await whatsapp.sendMessage(sessionKey, phone, message);
+  }
+
+  Future<void> _syncAppointmentToServer(
+    WhatsAppProvider whatsapp,
+    Map<String, dynamic> business,
+    Map<String, dynamic> apt,
+    String status,
+  ) {
+    final businessKey = business['id'].toString();
+    return whatsapp.syncAppointments([
+      {
+        'businessId': businessKey,
+        'appointmentId': apt['id'].toString(),
+        'customerName': apt['customerName'] ?? '',
+        'customerPhone': apt['customerPhone']?.toString() ?? '',
+        'businessName': business['name']?.toString() ?? '',
+        'serviceName': apt['serviceName'] ?? '',
+        'date': apt['date'],
+        'time': apt['time'],
+        'price': (apt['price'] as double?) ?? 0,
+        'status': status,
+      }
+    ]);
   }
 
   Widget _detailRow(String label, String value) {

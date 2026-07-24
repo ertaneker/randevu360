@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:randevu360/providers/customer_provider.dart';
+import 'package:esnaftakvim/providers/customer_provider.dart';
 
 // ---------------------------------------------------------------------------
 // CustomerProvider — unit tests for state management and computed properties.

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/business_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../core/backup/backup_service.dart';
 import '../../core/database/database_service.dart';
@@ -14,6 +15,9 @@ import '../business/working_hours_screen.dart';
 import '../settings/categories_screen.dart';
 import '../settings/services_screen.dart';
 import '../settings/message_templates_screen.dart';
+import '../settings/employee_permissions_screen.dart';
+import '../settings/grid_display_hours_screen.dart';
+import '../../services/cloud_api_service.dart';
 import 'about_screen.dart';
 import 'terms_screen.dart';
 import 'privacy_screen.dart';
@@ -95,6 +99,13 @@ class ProfileScreen extends StatelessWidget {
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const MessageTemplatesScreen()));
                       }),
                       const Divider(height: 1),
+                      _MenuItem(Icons.shield, 'Çalışan Yetkilendirme', () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const EmployeePermissionsScreen()));
+                      }),
+                      _MenuItem(Icons.grid_view, 'Grid Görüntüleme Saatleri', () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const GridDisplayHoursScreen()));
+                      }),
+                      const Divider(height: 1),
                       _MenuItem(Icons.calendar_month, context.l10n.workingHoursMenu, () {
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const WorkingHoursScreen()));
                       }),
@@ -155,6 +166,8 @@ class ProfileScreen extends StatelessWidget {
                       }),
                       const Divider(height: 1),
                       const _AutoBackupSwitch(),
+                      const Divider(height: 1),
+                      const _SharedWhatsAppSwitch(),
                     ],
                   ],
                 ),
@@ -198,7 +211,7 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Center(
                 child: Text(
-                  'Randevu 360 v1.0.0',
+                  'Esnaf Takvim v1.0.0',
                   style: TextStyle(color: Colors.grey[500], fontSize: 13),
                 ),
               ),
@@ -250,6 +263,66 @@ class _AutoBackupSwitchState extends State<_AutoBackupSwitch> {
   }
 }
 
+/// Ortak WhatsApp hattı anahtarı. Açıkken tüm çalışanlar aynı WhatsApp hattını
+/// kullanır — çalışanların ayrıca bağlantı yapması gerekmez.
+class _SharedWhatsAppSwitch extends StatefulWidget {
+  const _SharedWhatsAppSwitch();
+
+  @override
+  State<_SharedWhatsAppSwitch> createState() => _SharedWhatsAppSwitchState();
+}
+
+class _SharedWhatsAppSwitchState extends State<_SharedWhatsAppSwitch> {
+  bool _enabled = false;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final bizProv = context.read<BusinessProvider>();
+      await bizProv.loadBusiness();
+      if (mounted) {
+        setState(() {
+          _enabled = bizProv.business?['sharedWhatsapp'] == true;
+          _loaded = true;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.share, color: AppTheme.primary),
+      title: const Text('Ortak WhatsApp Hattı'),
+      subtitle: const Text('Tüm çalışanlar aynı WhatsApp hattını kullansın',
+          style: TextStyle(fontSize: 12)),
+      value: _enabled,
+      onChanged: !_loaded
+          ? null
+          : (v) async {
+              setState(() => _enabled = v);
+              final db = context.read<DatabaseService>();
+              final bizProv = context.read<BusinessProvider>();
+              final bizId = bizProv.business?['id'] as int;
+              final remoteId =
+                  bizProv.business?['remoteId'] as String?;
+              await db.setSharedWhatsapp(bizId, v);
+              // Firestore'a da yaz — çalışan cihazı buradan okur
+              if (remoteId != null && remoteId.isNotEmpty) {
+                try {
+                  await CloudApiService()
+                      .updateSharedWhatsapp(remoteId, v);
+                } catch (_) {}
+              }
+              // Provider önbelleğini tazele
+              await bizProv.loadBusiness();
+            },
+    );
+  }
+}
+
 /// Dil seçimi — liste tile + bottom sheet ile 10 dil arasından seçim.
 class _LanguageSelector extends StatelessWidget {
   @override
@@ -257,7 +330,7 @@ class _LanguageSelector extends StatelessWidget {
     final localeProv = context.watch<LocaleProvider>();
     final current = localeProv.locale;
 
-    final allLocales = AppLocalizations.supportedLocales;
+    const allLocales = AppLocalizations.supportedLocales;
     final currentName = current != null
         ? _localeDisplayName(current.languageCode)
         : context.l10n.languageSystemDefault;

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import '../core/database/database_service.dart';
+import '../services/data_sync_service.dart';
 
 class ServiceProvider extends ChangeNotifier {
   DatabaseService? _db;
@@ -76,6 +77,7 @@ class ServiceProvider extends ChangeNotifier {
         category: Value(data['category'] as String?),
       ));
       await loadServices(data['businessId'] as int);
+      DataSyncService.instance.nudge();
       return true;
     } catch (e) {
       _error = e.toString();
@@ -93,6 +95,7 @@ class ServiceProvider extends ChangeNotifier {
         category: Value(data['category'] as String?),
       ));
       await loadServices(data['businessId'] as int);
+      DataSyncService.instance.nudge();
       return true;
     } catch (e) {
       _error = e.toString();

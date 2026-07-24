@@ -4,6 +4,7 @@ import '../../providers/finance_provider.dart';
 import '../../providers/business_provider.dart';
 import '../../core/l10n/l10n_ext.dart';
 import '../../core/theme/app_theme.dart';
+import 'finance_screen.dart';
 
 class TransactionListScreen extends StatefulWidget {
   const TransactionListScreen({super.key});
@@ -90,6 +91,11 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                           final isIncome = tx['type'] == 'income';
                           return Card(
                             child: ListTile(
+                              onTap: () => showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                builder: (_) => TransactionEditSheet(editing: tx),
+                              ),
                               leading: CircleAvatar(
                                 backgroundColor: (isIncome ? AppTheme.success : AppTheme.error).withValues(alpha: 0.1),
                                 child: Icon(

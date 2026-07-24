@@ -8,6 +8,8 @@ import '../../providers/whatsapp_provider.dart';
 import '../../core/l10n/l10n_ext.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/debt_sync.dart';
+import '../../services/permission_service.dart';
+import '../../services/whatsapp_session.dart';
 
 /// Borcu olan müşteriler. Müşteri seçilip kısmi ya da tam tahsilat yapılabilir;
 /// kalan borç takip edilir. WhatsApp ikonuyla anında hatırlatma da gönderilir.
@@ -60,8 +62,21 @@ class _DebtorsScreenState extends State<DebtorsScreen> {
     final business = context.read<BusinessProvider>().business;
     if (business == null) return;
 
+    if (!await PermissionService.can(
+        context, EmployeePermissionKey.sendWhatsapp)) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('WhatsApp mesajı gönderme yetkiniz yok.'),
+        backgroundColor: AppTheme.warning,
+      ));
+      return;
+    }
+    if (!mounted) return;
+
+    final sessionKey = await resolveWhatsAppSessionKey(context);
+    if (!mounted) return;
+
     final ok = await context.read<WhatsAppProvider>().sendTemplate(
-      business['id'].toString(),
+      sessionKey,
       debtor['phone'] as String,
       'debt-reminder',
       {

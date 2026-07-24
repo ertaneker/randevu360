@@ -3,17 +3,38 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/appointment_provider.dart';
 import '../../providers/customer_provider.dart';
 import '../../providers/employee_provider.dart';
 import '../../providers/business_provider.dart';
 import '../../providers/service_provider.dart';
 import '../../providers/whatsapp_provider.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/l10n/l10n_ext.dart';
 import '../../core/theme/app_theme.dart';
 
+/// dakikayı TimeOfDay'e ekler (gün taşması olursa 23:59'da durur — randevu
+/// gece yarısını geçmemeli).
+TimeOfDay _addMinutesToTime(TimeOfDay time, int minutes) {
+  final total = time.hour * 60 + time.minute + minutes;
+  final clamped = total.clamp(0, 23 * 60 + 59);
+  return TimeOfDay(hour: clamped ~/ 60, minute: clamped % 60);
+}
+
+int _timeToMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
+
 class NewAppointmentScreen extends StatefulWidget {
-  const NewAppointmentScreen({super.key});
+  final int? preSelectedEmployeeId;
+  final String? preSelectedDate;
+  final String? preSelectedTime;
+
+  const NewAppointmentScreen({
+    super.key,
+    this.preSelectedEmployeeId,
+    this.preSelectedDate,
+    this.preSelectedTime,
+  });
 
   @override
   State<NewAppointmentScreen> createState() => _NewAppointmentScreenState();
@@ -29,17 +50,49 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
   int? _selectedCustomerId;
   int? _selectedServiceId;
   int? _selectedEmployeeId;
-  DateTime _selectedDate = DateTime.now();
-  TimeOfDay _selectedTime = TimeOfDay.now();
+  late DateTime _selectedDate;
+  late TimeOfDay _selectedTime;
+  // null: kullanıcı dokunmadı, bitiş = başlangıç + ayarlardaki periyot.
+  TimeOfDay? _selectedEndTime;
+  int _slotMinutes = kDefaultAppointmentSlotMinutes;
   bool _isSaving = false;
   bool _customersLoaded = false;
   bool _employeesLoaded = false;
   bool _servicesLoaded = false;
 
+  TimeOfDay get _effectiveEndTime =>
+      _selectedEndTime ?? _addMinutesToTime(_selectedTime, _slotMinutes);
+
   @override
   void initState() {
     super.initState();
+    // Pre-fill from grid cell tap
+    if (widget.preSelectedDate != null) {
+      _selectedDate = DateFormat('yyyy-MM-dd').parse(widget.preSelectedDate!);
+    } else {
+      _selectedDate = DateTime.now();
+    }
+    if (widget.preSelectedTime != null) {
+      final parts = widget.preSelectedTime!.split(':');
+      _selectedTime = TimeOfDay(
+        hour: int.tryParse(parts[0]) ?? DateTime.now().hour,
+        minute: int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0,
+      );
+    } else {
+      _selectedTime = TimeOfDay.now();
+    }
+    _selectedEmployeeId = widget.preSelectedEmployeeId;
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSlotMinutes());
+  }
+
+  Future<void> _loadSlotMinutes() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _slotMinutes = prefs.getInt(kAppointmentSlotMinutesPrefKey) ??
+          kDefaultAppointmentSlotMinutes;
+    });
   }
 
   @override
@@ -114,8 +167,39 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
       },
     );
     if (picked != null) {
-      setState(() => _selectedTime = picked);
+      setState(() {
+        _selectedTime = picked;
+        // Elle girilmiş bitiş, yeni başlangıçtan önce/eşit kaldıysa geçersiz
+        // olur — otomatik hesaplamaya dön.
+        if (_selectedEndTime != null &&
+            _timeToMinutes(_selectedEndTime!) <= _timeToMinutes(picked)) {
+          _selectedEndTime = null;
+        }
+      });
     }
+  }
+
+  Future<void> _pickEndTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _effectiveEndTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: AppTheme.primary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked == null) return;
+    if (_timeToMinutes(picked) <= _timeToMinutes(_selectedTime)) {
+      _showError('Bitiş saati başlangıçtan sonra olmalı');
+      return;
+    }
+    setState(() => _selectedEndTime = picked);
   }
 
   Future<void> _save() async {
@@ -140,6 +224,9 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
       final timeStr =
           '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}';
+      final endTime = _effectiveEndTime;
+      final endTimeStr =
+          '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
 
       final appointmentProvider = context.read<AppointmentProvider>();
       final price = double.tryParse(_priceController.text) ?? 0;
@@ -150,6 +237,7 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
         'serviceId': _selectedServiceId,
         'date': dateStr,
         'time': timeStr,
+        'endTime': endTimeStr,
         'price': price,
         'note': _noteController.text.trim(),
         'createdBy': 'owner',
@@ -563,6 +651,31 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: _pickEndTime,
+                borderRadius: BorderRadius.circular(12),
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: _selectedEndTime == null
+                        ? 'Bitiş Saati (otomatik, $_slotMinutes dk)'
+                        : 'Bitiş Saati',
+                    prefixIcon: const Icon(Icons.access_time_filled),
+                    suffixIcon: _selectedEndTime == null
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.refresh, size: 20),
+                            tooltip: 'Otomatiğe dön',
+                            onPressed: () =>
+                                setState(() => _selectedEndTime = null),
+                          ),
+                  ),
+                  child: Text(
+                    _effectiveEndTime.format(context),
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
               ),
 
               const SizedBox(height: 24),

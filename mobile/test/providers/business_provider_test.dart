@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:randevu360/providers/business_provider.dart';
+import 'package:esnaftakvim/providers/business_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Tests for BusinessProvider — focuses on initial state and conditional

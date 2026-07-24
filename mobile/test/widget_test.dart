@@ -5,9 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:firebase_auth/firebase_auth.dart' show User, UserCredential;
 import 'package:provider/provider.dart';
 
-import 'package:randevu360/core/auth/auth_service.dart';
-import 'package:randevu360/providers/auth_provider.dart';
-import 'package:randevu360/screens/auth/login_screen.dart';
+import 'package:esnaftakvim/core/auth/auth_service.dart';
+import 'package:esnaftakvim/core/l10n/l10n_ext.dart';
+import 'package:esnaftakvim/providers/auth_provider.dart';
+import 'package:esnaftakvim/screens/auth/login_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Manual mock for IAuthService — no real Firebase calls.
@@ -58,6 +59,9 @@ void main() {
             ),
           ],
           child: const MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: Locale('tr'),
             home: LoginScreen(),
           ),
         ),
@@ -65,7 +69,7 @@ void main() {
       // Let the auth stream listener process and the first frame render.
       await tester.pump();
 
-      expect(find.text('Randevu 360'), findsOneWidget);
+      expect(find.text('Esnaf Takvim'), findsOneWidget);
     });
 
     testWidgets('LoginScreen shows Google sign-in button', (tester) async {
@@ -82,6 +86,9 @@ void main() {
             ),
           ],
           child: const MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: Locale('tr'),
             home: LoginScreen(),
           ),
         ),
@@ -105,6 +112,9 @@ void main() {
             ),
           ],
           child: const MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: Locale('tr'),
             home: LoginScreen(),
           ),
         ),
