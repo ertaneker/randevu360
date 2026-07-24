@@ -17,7 +17,7 @@ dependencies:
   firebase_auth: ^4.17.0
   firebase_messaging: ^14.7.0
   # Google services
-  google_sign_in: ^6.2.0
+  google_sign_in: ^6.1.0
   googleapis: ^13.0.0
   googleapis_auth: ^1.4.1
   extension_google_sign_in_as_googleapis_auth: ^2.0.12
