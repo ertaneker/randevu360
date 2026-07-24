@@ -14,10 +14,12 @@ import 'providers/service_provider.dart';
 import 'providers/whatsapp_provider.dart';
 import 'providers/locale_provider.dart';
 import 'services/notification_service.dart';
-import 'services/firestore_sync_service.dart';
+import 'services/cloud_api_service.dart';
+import 'services/data_sync_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/role_selection_screen.dart';
 import 'screens/home/home_screen.dart';
+import 'screens/startup/startup_gate.dart';
 import 'screens/whatsapp/whatsapp_connect_screen.dart';
 import 'screens/whatsapp/bulk_message_screen.dart';
 import 'screens/whatsapp/message_history_screen.dart';
@@ -28,15 +30,16 @@ import 'screens/business/business_info_screen.dart';
 import 'screens/business/working_hours_screen.dart';
 import 'screens/settings/services_screen.dart';
 import 'screens/settings/message_templates_screen.dart';
+import 'screens/settings/employee_permissions_screen.dart';
 import 'screens/profile/about_screen.dart';
 import 'screens/profile/terms_screen.dart';
 import 'screens/profile/privacy_screen.dart';
 
-class Randevu360App extends StatelessWidget {
+class EsnafTakvimApp extends StatelessWidget {
   final DatabaseService databaseService;
   final NotificationService notificationService;
 
-  const Randevu360App({
+  const EsnafTakvimApp({
     super.key,
     required this.databaseService,
     required this.notificationService,
@@ -81,14 +84,14 @@ class Randevu360App extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LocaleProvider()..load()),
         Provider.value(value: databaseService),
         Provider.value(value: notificationService),
-        Provider(create: (_) => FirestoreSyncService()),
+        Provider(create: (_) => CloudApiService()),
       ],
       child: Consumer2<AuthProvider, LocaleProvider>(
         builder: (context, auth, localeProv, _) {
           // Kullanıcı manuel dil seçtiyse onu kullan, yoksa cihaz diline göre.
           final manualLocale = localeProv.locale;
           return MaterialApp(
-            title: 'Randevu 360',
+            title: 'Esnaf Takvim',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
@@ -119,13 +122,14 @@ class Randevu360App extends StatelessWidget {
               '/working-hours': (_) => const WorkingHoursScreen(),
               '/services': (_) => const ServicesScreen(),
               '/message-templates': (_) => const MessageTemplatesScreen(),
+              '/employee-permissions': (_) => const EmployeePermissionsScreen(),
               '/about': (_) => const AboutScreen(),
               '/terms': (_) => const TermsScreen(),
               '/privacy': (_) => const PrivacyScreen(),
             },
             onUnknownRoute: (settings) => MaterialPageRoute(
               builder: (_) => Scaffold(
-                appBar: AppBar(title: const Text('Randevu 360')),
+                appBar: AppBar(title: const Text('Esnaf Takvim')),
                 body: const Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -152,9 +156,7 @@ class Randevu360App extends StatelessWidget {
     if (auth.status == AuthStatus.loading ||
         auth.status == AuthStatus.checking ||
         auth.status == AuthStatus.authenticating) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const _StartupLoadingScreen();
     }
 
     // Not authenticated — show login
@@ -162,13 +164,94 @@ class Randevu360App extends StatelessWidget {
       return const LoginScreen();
     }
 
-    // Already registered (owner or employee) — skip role selection, go to home
+    // Already registered (owner or employee) — açılış kontrolleri
+    // (WhatsApp durumu + Drive yedek senkronu) bittikten sonra ana ekran.
     if (auth.businessData != null) {
-      return const HomeScreen();
+      return const _AppLifecycleObserver(
+          child: StartupGate(child: HomeScreen()));
     }
 
     // New user — show role selection
     return const RoleSelectionScreen();
   }
+}
 
+/// Auth çözülürken gösterilen açılış ekranı. Gerçek adım kontrolleri
+/// (WhatsApp + yedek) girişten sonra [StartupGate] içinde yapılır.
+class _StartupLoadingScreen extends StatelessWidget {
+  const _StartupLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Esnaf Takvim',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primary,
+                  ),
+                ),
+                SizedBox(height: 48),
+                LinearProgressIndicator(),
+                SizedBox(height: 24),
+                Text(
+                  'Google hesabı kontrol ediliyor...',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Uygulama ön plan/arka plan geçişlerinde DataSyncService polling'ini
+/// yönetir. Ön planda 30 sn'de bir pull, arka planda duraklatma.
+class _AppLifecycleObserver extends StatefulWidget {
+  final Widget child;
+  const _AppLifecycleObserver({required this.child});
+
+  @override
+  State<_AppLifecycleObserver> createState() => _AppLifecycleObserverState();
+}
+
+class _AppLifecycleObserverState extends State<_AppLifecycleObserver>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      DataSyncService.instance.onAppResume();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      DataSyncService.instance.onAppPause();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

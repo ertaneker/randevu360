@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import '../core/database/database_service.dart';
-import '../services/firestore_sync_service.dart';
+import '../services/cloud_api_service.dart';
 import 'dart:convert';
 
 class BusinessProvider extends ChangeNotifier {
@@ -14,6 +14,17 @@ class BusinessProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isSetupComplete => _business != null;
+
+  /// Grid görünümü için varsayılan saat aralığı.
+  /// İşletme çalışma saatlerinden okur; yoksa 08:00-20:00 döner.
+  Map<String, int> get defaultGridTimeRange {
+    final hours = _business?['workingHours'] as Map<String, dynamic>?;
+    final start =
+        int.tryParse((hours?['start']?.toString() ?? '08:00').split(':').first) ?? 8;
+    final end =
+        int.tryParse((hours?['end']?.toString() ?? '20:00').split(':').first) ?? 20;
+    return {'start': start, 'end': end};
+  }
 
   void setDatabase(DatabaseService db) {
     _db = db;
@@ -29,7 +40,10 @@ class BusinessProvider extends ChangeNotifier {
       // Fix duplicate rows from previous buggy saveBusiness
       await _db!.cleanupDuplicateBusinesses();
       final result = await _db!.getMyBusiness();
-      if (result != null) {
+      if (result == null) {
+        // Veri temizlendiyse (wipeAllData) eski işletme bilgisi düşmeli
+        _business = null;
+      } else {
         _business = {
           'id': result.id,
           'remoteId': result.remoteId,
@@ -38,9 +52,11 @@ class BusinessProvider extends ChangeNotifier {
           'address': result.address,
           'email': result.email,
           'ownerName': result.ownerName,
+          'ownerFbUid': result.ownerFbUid,
           'workingDays': jsonDecode(result.workingDays),
           'workingHours': jsonDecode(result.workingHours),
           'status': result.status,
+          'sharedWhatsapp': result.sharedWhatsapp,
         };
       }
     } catch (e) {
@@ -114,7 +130,7 @@ class BusinessProvider extends ChangeNotifier {
   Future<void> _syncToFirestore(Map<String, dynamic> data, String ownerFbUid) async {
     if (ownerFbUid.isEmpty) return;
     try {
-      final syncService = FirestoreSyncService();
+      final syncService = CloudApiService();
       await syncService.upsertBusiness(
         remoteId: ownerFbUid,
         name: data['name']?.toString() ?? '',
@@ -122,6 +138,13 @@ class BusinessProvider extends ChangeNotifier {
         ownerEmail: data['email']?.toString() ?? '',
         ownerName: data['ownerName']?.toString() ?? '',
       );
+      // Çalışma saatlerini de Firestore'a yaz — çalışan cihazı okur
+      if (data['workingDays'] != null || data['workingHours'] != null) {
+        await syncService.updateBusinessSettings(ownerFbUid, {
+          if (data['workingDays'] != null) 'workingDays': data['workingDays'],
+          if (data['workingHours'] != null) 'workingHours': data['workingHours'],
+        });
+      }
     } catch (_) {
       // Firestore sync failure is non-fatal — business works locally
     }
@@ -152,7 +175,7 @@ class BusinessProvider extends ChangeNotifier {
     }
 
     try {
-      final syncService = FirestoreSyncService();
+      final syncService = CloudApiService();
       await syncService.upsertBusiness(
         remoteId: remoteId,
         name: current['name']?.toString() ?? '',

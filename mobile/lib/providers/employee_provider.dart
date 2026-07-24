@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import '../core/database/database_service.dart';
-import '../services/firestore_sync_service.dart';
+import '../services/data_sync_service.dart';
+import '../services/cloud_api_service.dart';
 
 class EmployeeProvider extends ChangeNotifier {
   DatabaseService? _db;
@@ -45,7 +46,7 @@ class EmployeeProvider extends ChangeNotifier {
   /// doldurulur — çalışan kendi cihazından giriş yapamaz, kullanıcıya
   /// gösterilmeli.
   Future<bool> addEmployee(Map<String, dynamic> data) async {
-    final email = FirestoreSyncService.normalizeEmail(data['email'] ?? '');
+    final email = CloudApiService.normalizeEmail(data['email'] ?? '');
     try {
       final db = _db!;
       await db.addEmployee(EmployeesCompanion(
@@ -67,8 +68,8 @@ class EmployeeProvider extends ChangeNotifier {
     final remoteId = data['businessRemoteId'] as String?;
     if (remoteId != null && remoteId.isNotEmpty && email.isNotEmpty) {
       try {
-        final syncService = FirestoreSyncService();
-        await syncService.addEmployee(
+        final api = CloudApiService();
+        await api.addEmployee(
           businessRemoteId: remoteId,
           email: email,
           name: data['name'] ?? '',
@@ -90,6 +91,7 @@ class EmployeeProvider extends ChangeNotifier {
     }
 
     await loadEmployees(data['businessId']);
+    DataSyncService.instance.nudge();
     return true;
   }
 
@@ -103,6 +105,7 @@ class EmployeeProvider extends ChangeNotifier {
       await db.deleteEmployee(employeeId);
       _employees.removeWhere((e) => e['id'] == employeeId);
       notifyListeners();
+      DataSyncService.instance.nudge();
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -113,7 +116,7 @@ class EmployeeProvider extends ChangeNotifier {
     final email = emp['email'] as String?;
     if (businessRemoteId != null && email != null && email.isNotEmpty) {
       try {
-        await FirestoreSyncService()
+        await CloudApiService()
             .removeEmployee(businessRemoteId, email);
       } catch (e) {
         _error = 'Çalışan yerelden silindi ama bulut daveti kaldırılamadı: $e';
@@ -135,10 +138,12 @@ class EmployeeProvider extends ChangeNotifier {
         notifyListeners();
 
         final email = _employees[index]['email'] as String?;
+        final fbUid = _employees[index]['fbUid'] as String?;
         if (businessRemoteId != null && email != null && email.isNotEmpty) {
           try {
-            await FirestoreSyncService()
-                .updateEmployeeRole(businessRemoteId, email, newRole);
+            await CloudApiService()
+                .updateEmployeeRole(businessRemoteId, email, newRole,
+                    fbUid: fbUid);
           } catch (_) {
             // Bulut güncellenemedi; çalışan bir sonraki girişte eski rolü görür
           }
@@ -147,6 +152,23 @@ class EmployeeProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _error = e.toString();
+      return false;
+    }
+  }
+
+  Future<bool> updateColor(int employeeId, String color) async {
+    try {
+      await _db!.updateEmployeeColor(employeeId, color);
+      final index = _employees.indexWhere((e) => e['id'] == employeeId);
+      if (index != -1) {
+        _employees[index]['color'] = color;
+        notifyListeners();
+      }
+      DataSyncService.instance.nudge();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
       return false;
     }
   }

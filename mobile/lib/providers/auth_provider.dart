@@ -5,7 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:drift/drift.dart' show Value;
 import '../core/auth/auth_service.dart';
 import '../core/database/database_service.dart';
-import '../services/firestore_sync_service.dart';
+import '../services/data_sync_service.dart';
+import '../services/cloud_api_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final IAuthService _authService;
@@ -59,24 +60,47 @@ class AuthProvider extends ChangeNotifier {
       _businessData = await _resolveRoleFromLocalDb(user);
     }
 
-    // 2. Already found locally — skip Firestore, we're done
+    // 2. Yerel kayıt çalışan girişiyse Firestore'dan hâlâ davetli mi doğrula —
+    //    işletme sahibi çalışanı sildiyse cihazdaki kayıt tek başına yeterli değil.
+    if (_businessData != null && _businessData!['viaEmployee'] == true) {
+      await _verifyEmployeeStillActive(user);
+    }
+
+    // 3. Already found locally — skip Firestore, we're done
     if (_businessData != null) return;
 
-    // 3. No local data — new user, try Firestore
+    // 4. No local data — new user, try Firestore
     try {
-      final syncService = FirestoreSyncService();
-      _businessData = await syncService.getEmployeeData(user.email ?? '', user.uid);
+      final api = CloudApiService();
+      _businessData = await api.getEmployeeData(user.email ?? '', user.uid);
     } catch (_) {
       _businessData = null;
     }
 
-    // 4. Firestore kullanıcıyı tanıdı ama yerel DB'de işletme yok (uygulama
+    // 5. Firestore kullanıcıyı tanıdı ama yerel DB'de işletme yok (uygulama
     //    yeniden kurulmuş / veri silinmiş). İşletme satırını yerelde yeniden
     //    oluştur; yoksa tüm ekranlar "işletme bilgisi bulunamadı" der.
     //    Detay veriler (müşteri, randevu, finans) local-first olduğundan
     //    ancak Drive yedeğinden geri gelir.
     if (_businessData != null && _db != null) {
       await _restoreLocalBusiness(user);
+    }
+  }
+
+  /// Çalışan daveti Firestore'dan silinmişse yerel kaydı da temizler;
+  /// kullanıcı RoleSelectionScreen'e düşer. Çevrimdışıyken (sorgu hatası)
+  /// yerel kayıt korunur — erişim kesilmez.
+  Future<void> _verifyEmployeeStillActive(User user) async {
+    try {
+      final api = CloudApiService();
+      final invite =
+          await api.findEmployeeInvite(user.email ?? '', user.uid);
+      if (invite == null) {
+        await _db?.deleteEmployeeByEmail(user.email ?? '');
+        _businessData = null;
+      }
+    } catch (_) {
+      // Doğrulanamadı (çevrimdışı vb.) — yerel oturum devam eder
     }
   }
 
@@ -133,6 +157,7 @@ class AuthProvider extends ChangeNotifier {
           'isOwner': employee.role == 'admin',
           'businessId': employee.businessId,
           'source': 'local',
+          'viaEmployee': true,
         };
       }
     } catch (_) {
@@ -177,6 +202,13 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    // Senkron motorunu durdur — oturum değişiminde eski remoteId ile
+    // Firestore'a yazmaya devam etmesin (PERMISSION_DENIED).
+    try {
+      DataSyncService.instance.stop();
+    } catch (_) {
+      // Test ortamında Firebase init olmadığında ignore
+    }
     try {
       await _authService.signOut();
     } catch (_) {

@@ -5,7 +5,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/business_provider.dart';
 import '../../providers/employee_provider.dart';
 import '../../core/database/database_service.dart';
-import '../../services/firestore_sync_service.dart';
+import '../../services/data_sync_service.dart';
+import '../../services/cloud_api_service.dart';
 import '../../core/l10n/l10n_ext.dart';
 import '../../core/theme/app_theme.dart';
 import '../business/business_setup_screen.dart';
@@ -102,6 +103,17 @@ class RoleSelectionScreen extends StatelessWidget {
     if (!context.mounted) return;
 
     if (businessProvider.isSetupComplete) {
+      // Cihazdaki işletme başkasına aitse (ör. silinen çalışanın eski
+      // işvereni) o veriye admin erişimi verilmez. Onayla temizlenir ve
+      // kullanıcı kendi işletmesini sıfırdan kurar.
+      final ownerFbUid = businessProvider.business?['ownerFbUid'] as String?;
+      if (ownerFbUid != null && ownerFbUid != auth.user?.uid) {
+        final wiped = await _confirmWipeForeignData(context);
+        if (!wiped || !context.mounted) return;
+        await _openBusinessSetup(context, auth);
+        return;
+      }
+
       auth.setSession(
         role: 'admin',
         businessId: businessProvider.business?['id'] as int?,
@@ -112,18 +124,67 @@ class RoleSelectionScreen extends StatelessWidget {
         (_) => false,
       );
     } else {
-      final result = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(builder: (_) => const BusinessSetupScreen()),
-      );
-
-      if (result == true && context.mounted) {
-        auth.setRole('admin');
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (_) => false,
-        );
-      }
+      await _openBusinessSetup(context, auth);
     }
+  }
+
+  Future<void> _openBusinessSetup(BuildContext context, AuthProvider auth) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const BusinessSetupScreen()),
+    );
+
+    if (result == true && context.mounted) {
+      auth.setRole('admin');
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (_) => false,
+      );
+    }
+  }
+
+  /// Cihazda başka işletmeye ait veri varken kullanıcı onayıyla tüm yerel
+  /// veriyi siler. true = temizlendi, devam edilebilir.
+  Future<bool> _confirmWipeForeignData(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber, color: AppTheme.warning),
+            SizedBox(width: 12),
+            Expanded(child: Text('Eski Veri Bulundu')),
+          ],
+        ),
+        content: const Text(
+          'Bu cihazda başka bir işletmeye ait veriler var. Kendi işletmenizi '
+          'kurmak için bu veriler silinecek. Devam edilsin mi?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Vazgeç'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Sil ve Devam Et',
+                style: TextStyle(color: AppTheme.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return false;
+
+    // Eski işletmenin senkron durumu (imleçler) da temizlenmeli — yoksa
+    // yeni işletme eski imleçle senkrona başlar.
+    DataSyncService.instance.stop();
+    await DataSyncService.clearLocalState();
+
+    if (!context.mounted) return false;
+    await context.read<DatabaseService>().wipeAllData();
+    if (!context.mounted) return false;
+    // Provider'lardaki eski işletme bilgisini düşür
+    await context.read<BusinessProvider>().loadBusiness();
+    return true;
   }
 
   void _enterAsEmployee(BuildContext context) async {
@@ -145,7 +206,7 @@ class RoleSelectionScreen extends StatelessWidget {
     );
 
     try {
-      final syncService = FirestoreSyncService();
+      final syncService = CloudApiService();
       final employeeData = await syncService.findEmployeeInvite(email, uid);
 
       if (!context.mounted) return;
@@ -154,8 +215,8 @@ class RoleSelectionScreen extends StatelessWidget {
       if (employeeData == null) {
         _showInfoDialog(
           context,
-          context.l10n.inviteNotFoundTitle,
-          context.l10n.inviteNotFoundMessage,
+          'Davet Bulunamadı',
+          'Davet bulunamadı. İşletme sahibi sizi çalışan listesinden çıkarmış olabilir.',
         );
         return;
       }
@@ -172,6 +233,18 @@ class RoleSelectionScreen extends StatelessWidget {
       }
 
       final businessProvider = context.read<BusinessProvider>();
+
+      // Cihazda FARKLI bir işletmenin verisi kaldıysa (eski işveren vb.)
+      // yeni işletmeye geçmeden önce onayla temizle.
+      await businessProvider.loadBusiness();
+      if (!context.mounted) return;
+      final localRemoteId = businessProvider.business?['remoteId'] as String?;
+      if (businessProvider.business != null &&
+          localRemoteId != remoteBusinessId) {
+        final wiped = await _confirmWipeForeignData(context);
+        if (!wiped || !context.mounted) return;
+      }
+
       final businessId = await businessProvider.adoptRemoteBusiness(
         remoteId: remoteBusinessId,
         name: businessName,
