@@ -70,6 +70,9 @@ jobs:
             -configuration Release \
             -archivePath $RUNNER_TEMP/Runner.xcarchive \
             -destination 'generic/platform=iOS' \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=3ZR932LU4L \
             -allowProvisioningUpdates \
             -authenticationKeyPath ~/private_keys/AuthKey.p8 \
             -authenticationKeyIssuerID "${{ secrets.APPLE_ISSUER_ID }}" \
