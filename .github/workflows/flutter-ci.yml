@@ -61,7 +61,7 @@ jobs:
           mkdir -p ~/private_keys
           echo "${{ secrets.APPLE_PRIVATE_KEY }}" > ~/private_keys/AuthKey.p8
 
-      - name: Archive iOS app
+      - name: Archive iOS app (no sign)
         working-directory: mobile
         run: |
           xcodebuild archive \
@@ -70,13 +70,9 @@ jobs:
             -configuration Release \
             -archivePath $RUNNER_TEMP/Runner.xcarchive \
             -destination 'generic/platform=iOS' \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM=3ZR932LU4L \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey.p8 \
-            -authenticationKeyIssuerID "${{ secrets.APPLE_ISSUER_ID }}" \
-            -authenticationKeyID "${{ secrets.APPLE_KEY_ID }}"
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM=3ZR932LU4L
 
       - name: Export IPA
         working-directory: mobile
