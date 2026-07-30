@@ -54,7 +54,7 @@ dependencies:
   equatable: ^2.0.5
   logger: ^2.0.2
   flutter_local_notifications: ^17.0.0
-  flutter_contacts: ^1.1.7
+  flutter_contacts: ^2.3.1
   workmanager: ^0.9.0+3
 
 dev_dependencies:
